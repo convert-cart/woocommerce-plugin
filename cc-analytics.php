@@ -5,7 +5,7 @@
  * Description: Official Woo Commerce Plugin Of Convert Cart Analytics
  * Author: Aamir
  * Author URI: http://www.convertcart.com
- * Version: 1.0
+ * Version: 1.1.1
  */
 
 /**
