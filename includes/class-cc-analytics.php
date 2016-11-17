@@ -15,15 +15,23 @@ class WC_CC_Analytics extends WC_Integration {
 	 * Init and hook in the integration.
 	 */
 	public function __construct() {
-		$this->id                 = 'cc-analytics';
-		$this->method_title       = __( 'CC Analytics Settings', 'woocommerce' );
+		global $woocommerce;
+		$this->id                 = 'cc_analytics';
+		$this->method_title       = __( 'CC Analytics Settings', 'woocommerce_cc_analytics' );
 		$this->method_description = __( 'Contact Convert Cart To Get Client ID', 'woocommerce_cc_analytics' );
+
 		// Load the settings.
 		$this->init_form_fields();
 		$this->init_settings();
 
 		// Define user set variables.
 		$this->cc_client_id  = $this->get_option( 'cc_client_id' );
+		add_action( 'woocommerce_update_options_integration_' . $this->id, array( $this, 'process_admin_options' ) );
+
+		if ( ! isset( $this->cc_client_id ) or '' === $this->cc_client_id ) {
+			return;
+		}
+
 		// Actions.
 		add_action( 'wp_head', array( $this, 'cc_init' ) );
 		add_action( 'wp_footer', array( $this, 'addEvents' ) );
@@ -40,7 +48,7 @@ class WC_CC_Analytics extends WC_Integration {
 				'type'              => 'text',
 				'description'       => __( 'Contact Convert Cart To Get Client ID', 'woocommerce_cc_analytics' ),
 				'desc_tip'          => true,
-				'default'           => '',
+				'default'           => ''
 			),
 		);
 	}
