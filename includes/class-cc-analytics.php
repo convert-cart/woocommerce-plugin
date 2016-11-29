@@ -1,10 +1,10 @@
 <?php
 /**
- * Integration Demo Integration.
+ * Convert Cart WooCommerce Integration.
  *
- * @package  WC_Integration_Demo_Integration
+ * @package  WC_CC_Analytics
  * @category Integration
- * @author   Patrick Rauland
+ * @author   Aamir
  */
 
 /**
@@ -48,7 +48,7 @@ class WC_CC_Analytics extends WC_Integration {
 				'type'              => 'text',
 				'description'       => __( 'Contact Convert Cart To Get Client ID', 'woocommerce_cc_analytics' ),
 				'desc_tip'          => true,
-				'default'           => ''
+				'default'           => '',
 			),
 		);
 	}
@@ -125,8 +125,15 @@ class WC_CC_Analytics extends WC_Integration {
 
 		if ( is_product_category() ) {
 			$event_info['ccEvent'] = $this->getEventType( 'categoryViewed' );
-			$event_info['title'] = get_the_title();
-			$event_info['url'] = get_permalink();
+			global $wp_query;
+			// get the query object.
+			$cat_obj = $wp_query->get_queried_object();
+			if ( is_object( $cat_obj ) ) {
+				$event_info['title'] = $cat_obj->name;
+				$event_info['url'] = get_category_link( $cat_obj->term_id );
+				$event_info['id'] = $cat_obj->term_id;
+				$event_info['count'] = $cat_obj->count;
+			}
 		}
 
 		if ( is_product() ) {
@@ -136,9 +143,7 @@ class WC_CC_Analytics extends WC_Integration {
 			$event_info['name'] = $product->post->post_title;
 			$event_info['url'] = $product->get_permalink();
 			$event_info['price'] = $product->get_price();
-			$event_info['regular_price'] = get_post_meta( $product->post->ID, '_regular_price', true );
-			$event_info['sale_price'] = get_post_meta( $product->post->ID, '_sale_price', true );
-			$event_info['final_price'] = $this->calculateFinalPrice( $event_info['regular_price'], $event_info['sale_price'] );
+			$event_info['regular_price'] = $product->get_regular_price();
 			$event_info['currency'] = get_woocommerce_currency();
 			$event_info['short_description'] = $product->post->post_excerpt;
 			$event_info['type'] = $product->product_type;
@@ -170,6 +175,12 @@ class WC_CC_Analytics extends WC_Integration {
 				$cart_item['name'] = $values['data']->post->post_title;
 				$cart_item['quantity'] = $values['quantity'];
 				$cart_item['price'] = $values['data']->price;
+				if ( $values['data']->post->ID ) {
+					$cart_item['url'] = get_permalink( $values['data']->post->ID );
+					$thumb_id = get_post_thumbnail_id( $values['data']->post->ID );
+					$thumb_url = wp_get_attachment_image_src( $thumb_id );
+					$cart_item['image'] = $thumb_url[0];
+				}
 				$cart_items[] = $cart_item;
 			}
 			$event_info['items'] = $cart_items;
@@ -186,6 +197,13 @@ class WC_CC_Analytics extends WC_Integration {
 				$cart_item['name'] = $values['data']->post->post_title;
 				$cart_item['quantity'] = $values['quantity'];
 				$cart_item['price'] = $values['data']->price;
+				if ( $values['data']->post->ID ) {
+					$cart_item['url'] = get_permalink( $values['data']->post->ID );
+					$thumb_id = get_post_thumbnail_id( $values['data']->post->ID );
+					$thumb_url = wp_get_attachment_image_src( $thumb_id );
+					$cart_item['image'] = $thumb_url[0];
+				}
+
 				$cart_items[] = $cart_item;
 			}
 			$event_info['items'] = $cart_items;
