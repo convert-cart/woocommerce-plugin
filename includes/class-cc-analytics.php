@@ -77,7 +77,7 @@ class WC_CC_Analytics extends WC_Integration {
 		if ( is_wc_endpoint_url( 'order-received' ) ) {
 			$event_info['ccEvent'] = $this->getEventType( 'orderCompleted' );
 			$order = wc_get_order( $data );
-			$event_info['orderId'] = $order->id;
+			$event_info['orderId'] = (string) $order->id;
 			$event_info['total'] = $order->get_total();
 			$event_info['currency'] = get_woocommerce_currency();
 			$event_info['status'] = $order->post->post_status;
@@ -257,7 +257,7 @@ class WC_CC_Analytics extends WC_Integration {
 			<script type='text/javascript'>
 				ccart('send', 'evv1', <?php echo $event_json; ?>)
 			</script>
-			<!-- ConvertCart -->";
+			<!-- ConvertCart -->
 		<?php }
 	}
 
