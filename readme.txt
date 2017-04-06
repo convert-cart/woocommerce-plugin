@@ -15,4 +15,5 @@ Official Convert Cart Plugin For Woo Commerce.
  * Fix - Fixed categoryViewed event.
 
  = 1.1.3
-  * Tweak - Added date in meta_data
+  * Tweak - Added date in meta_data.
+  * Tweak - Pass orderId as string in orderCompleted event.  
