@@ -277,6 +277,8 @@ class WC_CC_Analytics extends WC_Integration {
 				$meta_data['customer_status'] = 'guest';
 			}
 		}
+
+		$meta_data['date'] = gmdate( 'Y-m-d H:i:s' );
 		$meta_data['currency'] = get_woocommerce_currency();
 		$meta_data['platform'] = 'Wordpress WooCommerce';
 		$meta_data['platform_version'] = $woocommerce->version;
