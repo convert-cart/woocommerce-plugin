@@ -141,6 +141,11 @@ class WC_CC_Analytics extends WC_Integration {
 			$event_info['ccEvent'] = $this->getEventType( 'productViewed' );
 			$event_info['id'] = $product->post->ID;
 			$event_info['name'] = $product->post->post_title;
+			$event_info['manage_stock'] = $product->get_manage_stock();
+			if ( $event_info['manage_stock'] ) {
+				$event_info['stock_quantity'] = $product->get_stock_quantity();
+			}
+			$event_info['is_in_stock'] = $product->is_in_stock();
 			$event_info['url'] = $product->get_permalink();
 			$event_info['price'] = $product->get_price();
 			$event_info['regular_price'] = $product->get_regular_price();
