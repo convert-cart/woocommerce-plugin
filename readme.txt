@@ -14,6 +14,9 @@ Official Convert Cart Plugin For Woo Commerce.
  * Tweak - Removed sale_price and final_price from productViewed event.
  * Fix - Fixed categoryViewed event.
 
- = 1.1.3
+= 1.1.3
   * Tweak - Added date in meta_data.
   * Tweak - Pass orderId as string in orderCompleted event.  
+
+= 1.1.4
+  * Tweak - Added manage_stock, stock_quantity, is_in_stock in productViewed event
