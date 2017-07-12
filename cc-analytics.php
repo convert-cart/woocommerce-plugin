@@ -5,15 +5,17 @@
  * Description: Official Woo Commerce Plugin Of Convert Cart Analytics
  * Author: Aamir
  * Author URI: http://www.convertcart.com
- * Version: 1.1.4
+ * Version: 1.1.5
  */
 
 /**
  * Add the integration to WooCommerce
  */
 function wc_cc_analytics( $integrations ) {
-	global $woocommerce;
+	// when updating version, update both above comment and below constant.
+	define( 'CC_PLUGIN_VERSION', '1.1.5' ); // used to include version in metaData of events.
 
+	global $woocommerce;
 	if ( is_object( $woocommerce ) ) {
 		include_once( 'includes/class-cc-analytics.php' );
 		$integrations[] = 'WC_Cc_Analytics';

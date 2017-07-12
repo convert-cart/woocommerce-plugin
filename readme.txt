@@ -6,9 +6,6 @@ Official Convert Cart Plugin For Woo Commerce.
 
 == Changelog ==
 
-= 1.1.1
- * Fix - Dont display convertcart script, if client id is not entered in backend.
-
 = 1.1.2
  * Tweak - Added image, url to cartViewed & checkoutViewed events.
  * Tweak - Removed sale_price and final_price from productViewed event.
@@ -19,4 +16,9 @@ Official Convert Cart Plugin For Woo Commerce.
   * Tweak - Pass orderId as string in orderCompleted event.  
 
 = 1.1.4
-  * Tweak - Added manage_stock, stock_quantity, is_in_stock in productViewed event
+  * Tweak - Added manage_stock, stock_quantity, is_in_stock in productViewed event.
+
+= 1.1.5
+  * Fix - Fixed image url in cartViewed, checkoutViewed and orderCompleted event for variable product.
+  * Tweak - Removed manage_stock and stock_quantity from productViewed event for security reasons.
+  * Tweak - Added plugin_version in metaData of all events.

@@ -94,13 +94,19 @@ class WC_CC_Analytics extends WC_Integration {
 			foreach ( $line_items as $item ) {
 				$order_item = array();
 				$product = $order->get_product_from_item( $item );
+				if ( ! is_object( $product ) ) {
+					continue;
+				}
 				$order_item['name'] = $product->get_title();
 				$order_item['price'] = $product->get_price();
 				$order_item['currency'] = get_woocommerce_currency();
 				$order_item['quantity'] = $item['qty'];
 				$order_item['url'] = get_permalink( $product->post->ID );
-
-				$thumb_id = get_post_thumbnail_id( $product->post->ID );
+				if ( $product->image_id ) {
+					$thumb_id = $product->image_id;
+				} else {
+					$thumb_id = get_post_thumbnail_id( $product->post->ID );
+				}
 				$thumb_url = wp_get_attachment_image_src( $thumb_id );
 				if ( ! empty( $thumb_url[0] ) ) {
 					$order_item['image'] = $thumb_url[0];
@@ -141,10 +147,6 @@ class WC_CC_Analytics extends WC_Integration {
 			$event_info['ccEvent'] = $this->getEventType( 'productViewed' );
 			$event_info['id'] = $product->post->ID;
 			$event_info['name'] = $product->post->post_title;
-			$event_info['manage_stock'] = $product->get_manage_stock();
-			if ( $event_info['manage_stock'] ) {
-				$event_info['stock_quantity'] = $product->get_stock_quantity();
-			}
 			$event_info['is_in_stock'] = $product->is_in_stock();
 			$event_info['url'] = $product->get_permalink();
 			$event_info['price'] = $product->get_price();
@@ -171,7 +173,6 @@ class WC_CC_Analytics extends WC_Integration {
 		if ( is_cart() ) {
 			$event_info['ccEvent'] = $this->getEventType( 'cartViewed' );
 			$cart = WC()->cart;
-
 			$event_info['total'] = $cart->total;
 			$event_info['currency'] = get_woocommerce_currency();
 			$items = $cart->get_cart();
@@ -182,7 +183,11 @@ class WC_CC_Analytics extends WC_Integration {
 				$cart_item['price'] = $values['data']->price;
 				if ( $values['data']->post->ID ) {
 					$cart_item['url'] = get_permalink( $values['data']->post->ID );
-					$thumb_id = get_post_thumbnail_id( $values['data']->post->ID );
+					if ( is_object( $values['data'] ) and $values['data']->image_id ) {
+						$thumb_id = $values['data']->image_id;
+					} else {
+						$thumb_id = get_post_thumbnail_id( $values['data']->post->ID );
+					}
 					$thumb_url = wp_get_attachment_image_src( $thumb_id );
 					$cart_item['image'] = $thumb_url[0];
 				}
@@ -204,7 +209,11 @@ class WC_CC_Analytics extends WC_Integration {
 				$cart_item['price'] = $values['data']->price;
 				if ( $values['data']->post->ID ) {
 					$cart_item['url'] = get_permalink( $values['data']->post->ID );
-					$thumb_id = get_post_thumbnail_id( $values['data']->post->ID );
+					if ( is_object( $values['data'] ) and $values['data']->image_id ) {
+						$thumb_id = $values['data']->image_id;
+					} else {
+						$thumb_id = get_post_thumbnail_id( $values['data']->post->ID );
+					}
 					$thumb_url = wp_get_attachment_image_src( $thumb_id );
 					$cart_item['image'] = $thumb_url[0];
 				}
@@ -288,6 +297,7 @@ class WC_CC_Analytics extends WC_Integration {
 		$meta_data['platform'] = 'Wordpress WooCommerce';
 		$meta_data['platform_version'] = $woocommerce->version;
 		$meta_data['wp_version'] = $wp_version;
+		$meta_data['plugin_version'] = CC_PLUGIN_VERSION;
 		return $meta_data;
 	}
 
