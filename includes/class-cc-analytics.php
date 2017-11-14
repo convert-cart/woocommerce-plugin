@@ -58,7 +58,7 @@ class WC_CC_Analytics extends WC_Integration {
 	public function cc_init() {
 		?>
 			<!-- ConvertCart -->
-			<script>                    
+			<script data-cfasync="false">
 			(function(c,o,n,v,e,r,t,s){s=c.fetch?'f':'',
 			c.ccartObj=e,c[e]=c[e]||function(){(c[e].q=c[e].q||[]).push(arguments)},c[e].t=Date.now(),
 			r=o.createElement(n);r.async=1;r.src=v+s+'.js';t=o.getElementsByTagName(n)[0];t.parentNode

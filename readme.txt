@@ -22,3 +22,6 @@ Official Convert Cart Plugin For Woo Commerce.
   * Fix - Fixed image url in cartViewed, checkoutViewed and orderCompleted event for variable product.
   * Tweak - Removed manage_stock and stock_quantity from productViewed event for security reasons.
   * Tweak - Added plugin_version in metaData of all events.
+
+= 1.1.6
+  * Tweak - Added "data-cfasync=false" attribute to script tag to disable cloudflare rocket loader.
