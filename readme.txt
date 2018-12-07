@@ -31,3 +31,6 @@ Official Convert Cart Plugin For Woo Commerce.
   * Fix   - Replaced deprecated wordpress/woocommerce functions.
   * Tweak - Removed woocommerce/wordpress words in meta_data.
   * Tweak - Removed categories from productViewed event.
+
+= 1.1.8
+  * Tweak - Added currency in cart items.
