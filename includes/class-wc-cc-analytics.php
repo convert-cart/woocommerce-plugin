@@ -244,6 +244,7 @@ class WC_CC_Analytics extends WC_Integration {
 			$cart_item['name']     = $values['data']->get_name();
 			$cart_item['quantity'] = $values['quantity'];
 			$cart_item['price']    = $values['data']->get_price();
+			$cart_item['currency'] = get_woocommerce_currency();
 			if ( isset( $product_id ) ) {
 				$cart_item['url'] = get_permalink( $product_id );
 				if ( $values['data']->get_image_id() ) {
