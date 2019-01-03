@@ -34,3 +34,6 @@ Official Convert Cart Plugin For Woo Commerce.
 
 = 1.1.8
   * Tweak - Added currency in cart items.
+
+= 1.1.9
+  * Tweak - Updated fieldname to clientId/domainId in configuration.

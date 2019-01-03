@@ -18,7 +18,7 @@ class WC_CC_Analytics extends WC_Integration {
 		global $woocommerce;
 		$this->id                 = 'cc_analytics';
 		$this->method_title       = __( 'CC Analytics Settings', 'woocommerce_cc_analytics' );
-		$this->method_description = __( 'Contact Convert Cart To Get Client ID', 'woocommerce_cc_analytics' );
+		$this->method_description = __( 'Contact Convert Cart To Get Client ID / Domain Id', 'woocommerce_cc_analytics' );
 
 		// Load the settings.
 		$this->init_form_fields();
@@ -44,9 +44,9 @@ class WC_CC_Analytics extends WC_Integration {
 	public function init_form_fields() {
 		$this->form_fields = array(
 			'cc_client_id' => array(
-				'title'       => __( 'Client ID', 'woocommerce_cc_analytics' ),
+				'title'       => __( 'Client ID / Domain Id', 'woocommerce_cc_analytics' ),
 				'type'        => 'text',
-				'description' => __( 'Contact Convert Cart To Get Client ID', 'woocommerce_cc_analytics' ),
+				'description' => __( 'Contact Convert Cart To Get Client ID / Domain Id', 'woocommerce_cc_analytics' ),
 				'desc_tip'    => true,
 				'default'     => '',
 			),
