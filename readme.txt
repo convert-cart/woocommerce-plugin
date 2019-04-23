@@ -37,3 +37,7 @@ Official Convert Cart Plugin For Woo Commerce.
 
 = 1.1.9
   * Tweak - Updated fieldname to clientId/domainId in configuration.
+
+= 1.2.0
+  * Tweak - Updated convertcart init script.
+  * Tweak - log events using ccLayer.

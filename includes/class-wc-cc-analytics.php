@@ -58,11 +58,7 @@ class WC_CC_Analytics extends WC_Integration {
 	public function cc_init() {
 		?>
 			<!-- ConvertCart -->
-			<script data-cfasync="false">
-			(function(c,o,n,v,e,r,t,s){s=c.fetch?'f':'',
-			c.ccartObj=e,c[e]=c[e]||function(){(c[e].q=c[e].q||[]).push(arguments)},c[e].t=Date.now(),
-			r=o.createElement(n);r.async=1;r.src=v+s+'.js';t=o.getElementsByTagName(n)[0];t.parentNode
-			.insertBefore(r,t)})(window, document,'script','//d241ujsiy3yht0.cloudfront.net/<?php echo esc_attr( $this->cc_client_id ); ?>','ccart')
+			<script data-cfasync="false" src="//d241ujsiy3yht0.cloudfront.net/<?php echo esc_attr( $this->cc_client_id ); ?>.js">
 			</script>
 			<!-- ConvertCart -->
 		<?php
@@ -286,7 +282,8 @@ class WC_CC_Analytics extends WC_Integration {
 			?>
 			<!-- ConvertCart -->
 			<script type='text/javascript'>
-				ccart('send', 'evv1', <?php echo $event_json; ?>)
+				window.ccLayer = window.ccLayer || [];
+				ccLayer.push(<?php echo $event_json; ?>);
 			</script>
 			<!-- ConvertCart -->
 			<?php
