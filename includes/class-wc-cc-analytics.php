@@ -58,7 +58,11 @@ class WC_CC_Analytics extends WC_Integration {
 	public function cc_init() {
 		?>
 			<!-- ConvertCart -->
-			<script data-cfasync="false" src="//d241ujsiy3yht0.cloudfront.net/<?php echo esc_attr( $this->cc_client_id ); ?>.js">
+			<script data-cfasync="false">
+				(function(c,o,n,v,e,r,t,s){s=c.fetch?'f':'',
+					c.ccartObj=e,c[e]=c[e]||function(){(c[e].q=c[e].q||[]).push(arguments)},c[e].t=Date.now(),
+				r=o.createElement(n);r.async=1;r.src=v+s+'.js';t=o.getElementsByTagName(n)[0];t.parentNode
+				.insertBefore(r,t)})(window, document,'script','//cdn.convertcart.com/<?php echo esc_attr( $this->cc_client_id ); ?>','ccart')
 			</script>
 			<!-- ConvertCart -->
 		<?php
@@ -120,10 +124,10 @@ class WC_CC_Analytics extends WC_Integration {
 	 */
 	public function addEvents() {
 		if ( is_front_page() && ! is_shop() ) {
-			$event_info['ccEvent'] = $this->getEventType( 'contentPageViewed' );
-			$event_info['type']    = 'Blog Home';
-		} elseif ( is_shop() ) {
 			$event_info['ccEvent'] = $this->getEventType( 'homepageViewed' );
+		} elseif ( is_shop() ) {
+			$event_info['ccEvent'] = $this->getEventType( 'categoryViewed' );
+			$event_info['type']    = 'Woo Home';
 		}
 
 		if ( is_product_category() ) {
@@ -150,7 +154,7 @@ class WC_CC_Analytics extends WC_Integration {
 			$event_info = $this->getContentPageProps();
 		}
 
-		if ( is_page() ) {
+		if ( is_page() && ! is_shop()) {
 			if ( ( ( ! is_product_category() && ! is_product() ) && ( ! is_checkout() && ! is_cart() ) ) ) {
 				$event_info = $this->getContentPageProps();
 			}
