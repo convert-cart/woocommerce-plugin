@@ -326,7 +326,7 @@ class WC_CC_Analytics extends WC_Integration {
 	public function getEventType( $event ) {
 		$event_map = array(
 			'homepageViewed'    => 'homepageViewed',
-			'shopPageViewed'	=> 'shopPageViewed',
+			'shopPageViewed'    => 'shopPageViewed',
 			'contentPageViewed' => 'contentPageViewed',
 			'categoryViewed'    => 'categoryViewed',
 			'productViewed'     => 'productViewed',
