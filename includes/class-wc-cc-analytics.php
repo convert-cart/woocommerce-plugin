@@ -126,8 +126,7 @@ class WC_CC_Analytics extends WC_Integration {
 		if ( is_front_page() && ! is_shop() ) {
 			$event_info['ccEvent'] = $this->getEventType( 'homepageViewed' );
 		} elseif ( is_shop() ) {
-			$event_info['ccEvent'] = $this->getEventType( 'categoryViewed' );
-			$event_info['type']    = 'Woo Home';
+			$event_info['ccEvent'] = $this->getEventType( 'shopPageViewed' );
 		}
 
 		if ( is_product_category() ) {
@@ -327,6 +326,7 @@ class WC_CC_Analytics extends WC_Integration {
 	public function getEventType( $event ) {
 		$event_map = array(
 			'homepageViewed'    => 'homepageViewed',
+			'shopPageViewed'	=> 'shopPageViewed',
 			'contentPageViewed' => 'contentPageViewed',
 			'categoryViewed'    => 'categoryViewed',
 			'productViewed'     => 'productViewed',
