@@ -74,48 +74,52 @@ class WC_CC_Analytics extends WC_Integration {
 	 * @param type string $data .
 	 */
 	public function ordered( $data ) {
-		if ( is_wc_endpoint_url( 'order-received' ) ) {
-			$event_info['ccEvent'] = $this->getEventType( 'orderCompleted' );
-			$order                 = wc_get_order( $data );
-			if ( ! is_object( $order ) ) {
-				return $event_info;
-			}
-			$event_info['orderId']  = (string) $order->get_id();
-			$event_info['total']    = $order->get_total();
-			$event_info['currency'] = get_woocommerce_currency();
-			$event_info['status']   = $order->get_status();
-			$promos                 = $order->get_used_coupons();
-
-			if ( is_array( $promos ) ) {
-				$event_info['coupon_code'] = isset( $promos[0] ) ? $promos[0] : null;
-			}
-
-			$line_items  = $order->get_items();
-			$order_items = array();
-
-			foreach ( $line_items as $item ) {
-				$order_item = array();
-				$product    = $order->get_product_from_item( $item );
-				if ( ! is_object( $product ) ) {
-					continue;
+		try {
+			if ( is_wc_endpoint_url( 'order-received' ) ) {
+				$event_info['ccEvent'] = $this->getEventType( 'orderCompleted' );
+				$order                 = wc_get_order( $data );
+				if ( ! is_object( $order ) ) {
+					return $event_info;
 				}
-				$order_item['name']     = $product->get_title();
-				$order_item['price']    = $product->get_price();
-				$order_item['currency'] = get_woocommerce_currency();
-				$order_item['quantity'] = isset( $item['qty'] ) ? $item['qty'] : null;
-				$order_item['url']      = get_permalink( $product->get_id() );
-				if ( $product->get_image_id() ) {
-					$thumb_id = $product->get_image_id();
-				} else {
-					$thumb_id = get_post_thumbnail_id( $product->get_id() );
+				$event_info['orderId']  = (string) $order->get_id();
+				$event_info['total']    = $order->get_total();
+				$event_info['currency'] = get_woocommerce_currency();
+				$event_info['status']   = $order->get_status();
+				$promos                 = $order->get_used_coupons();
+
+				if ( is_array( $promos ) ) {
+					$event_info['coupon_code'] = isset( $promos[0] ) ? $promos[0] : null;
 				}
 
-				$thumb_url           = wp_get_attachment_image_src( $thumb_id );
-				$order_item['image'] = isset( $thumb_url[0] ) ? $thumb_url[0] : null;
-				$order_items[]       = $order_item;
+				$line_items  = $order->get_items();
+				$order_items = array();
+
+				foreach ( $line_items as $item ) {
+					$order_item = array();
+					$product    = $order->get_product_from_item( $item );
+					if ( ! is_object( $product ) ) {
+						continue;
+					}
+					$order_item['name']     = $product->get_title();
+					$order_item['price']    = $product->get_price();
+					$order_item['currency'] = get_woocommerce_currency();
+					$order_item['quantity'] = isset( $item['qty'] ) ? $item['qty'] : null;
+					$order_item['url']      = get_permalink( $product->get_id() );
+					if ( $product->get_image_id() ) {
+						$thumb_id = $product->get_image_id();
+					} else {
+						$thumb_id = get_post_thumbnail_id( $product->get_id() );
+					}
+
+					$thumb_url           = wp_get_attachment_image_src( $thumb_id );
+					$order_item['image'] = isset( $thumb_url[0] ) ? $thumb_url[0] : null;
+					$order_items[]       = $order_item;
+				}
+				$event_info['items'] = $order_items;
+				$script              = $this->displayEventScript( $event_info );
 			}
-			$event_info['items'] = $order_items;
-			$script              = $this->displayEventScript( $event_info );
+		} catch ( Error $err ) {
+			// ignore error.
 		}
 	}
 
@@ -123,44 +127,37 @@ class WC_CC_Analytics extends WC_Integration {
 	 * Function to track various events
 	 */
 	public function addEvents() {
-		if ( is_front_page() && ! is_shop() ) {
-			$event_info['ccEvent'] = $this->getEventType( 'homepageViewed' );
-		} elseif ( is_shop() ) {
-			$event_info['ccEvent'] = $this->getEventType( 'shopPageViewed' );
-		}
-
-		if ( is_product_category() ) {
-			$event_info = $this->getCategoryViewedProps();
-		}
-
-		if ( is_product() ) {
-			$event_info = $this->getProductViewedProps();
-		}
-
-		if ( is_cart() || ( is_checkout() && ! is_wc_endpoint_url( 'order-received' ) ) ) {
-			if ( is_cart() ) {
-				$event_info['ccEvent'] = $this->getEventType( 'cartViewed' );
-			} elseif ( is_checkout() && ! is_wc_endpoint_url( 'order-received' ) ) {
-				$event_info['ccEvent'] = $this->getEventType( 'checkoutViewed' );
-			}
-			$cart                   = WC()->cart;
-			$event_info['total']    = $cart->total;
-			$event_info['currency'] = get_woocommerce_currency();
-			$event_info['items']    = $this->getCartItems( $cart->get_cart() );
-		}
-
-		if ( is_single() && ! is_product() ) {
-			$event_info = $this->getContentPageProps();
-		}
-
-		if ( is_page() && ! is_shop() ) {
-			if ( ( ( ! is_product_category() && ! is_product() ) && ( ! is_checkout() && ! is_cart() ) ) ) {
+		try {
+			if ( is_front_page() && ! is_shop() ) {
+				$event_info['ccEvent'] = $this->getEventType( 'homepageViewed' );
+			} elseif ( is_shop() ) {
+				$event_info['ccEvent'] = $this->getEventType( 'shopPageViewed' );
+			} elseif ( is_product_category() ) {
+				$event_info = $this->getCategoryViewedProps();
+			} elseif ( is_product() ) {
+				$event_info = $this->getProductViewedProps();
+			} elseif ( is_search() ) {
+				$event_info['ccEvent'] = $this->getEventType( 'productsSearched' );
+				$event_info['query']   = get_search_query();
+			} elseif ( is_cart() || ( is_checkout() && ! is_wc_endpoint_url( 'order-received' ) ) ) {
+				if ( is_cart() ) {
+					$event_info['ccEvent'] = $this->getEventType( 'cartViewed' );
+				} elseif ( is_checkout() && ! is_wc_endpoint_url( 'order-received' ) ) {
+					$event_info['ccEvent'] = $this->getEventType( 'checkoutViewed' );
+				}
+				$cart                   = WC()->cart;
+				$event_info['total']    = $cart->total;
+				$event_info['currency'] = get_woocommerce_currency();
+				$event_info['items']    = $this->getCartItems( $cart->get_cart() );
+			} elseif ( is_single() || is_page() ) {
 				$event_info = $this->getContentPageProps();
 			}
-		}
 
-		if ( isset( $event_info ) ) {
-			$script = $this->displayEventScript( $event_info );
+			if ( isset( $event_info ) ) {
+				$script = $this->displayEventScript( $event_info );
+			}
+		} catch ( Error $err ) {
+			// ignore error.
 		}
 	}
 
@@ -327,6 +324,7 @@ class WC_CC_Analytics extends WC_Integration {
 		$event_map = array(
 			'homepageViewed'    => 'homepageViewed',
 			'shopPageViewed'    => 'shopPageViewed',
+			'productsSearched'  => 'productsSearched',
 			'contentPageViewed' => 'contentPageViewed',
 			'categoryViewed'    => 'categoryViewed',
 			'productViewed'     => 'productViewed',
