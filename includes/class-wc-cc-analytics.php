@@ -251,7 +251,7 @@ class WC_CC_Analytics extends WC_Integration {
 				} else {
 					$thumb_id = get_post_thumbnail_id( $product_id );
 				}
-				$thumb_url          = wp_get_attachment_image_src( $thumb_id );
+				$thumb_url          = wp_get_attachment_image_src( $thumb_id, 'full' );
 				$cart_item['image'] = isset( $thumb_url[0] ) ? $thumb_url[0] : null;
 			}
 			$cart_items[] = $cart_item;
