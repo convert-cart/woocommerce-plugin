@@ -153,7 +153,7 @@ class WC_CC_Analytics extends WC_Integration {
 			$event_info = $this->getContentPageProps();
 		}
 
-		if ( is_page() && ! is_shop()) {
+		if ( is_page() && ! is_shop() ) {
 			if ( ( ( ! is_product_category() && ! is_product() ) && ( ! is_checkout() && ! is_cart() ) ) ) {
 				$event_info = $this->getContentPageProps();
 			}
