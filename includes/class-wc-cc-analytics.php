@@ -206,7 +206,7 @@ class WC_CC_Analytics extends WC_Integration {
 		$event_info['type']          = $product->get_type();
 		$thumb_id                    = get_post_thumbnail_id();
 		if ( isset( $thumb_id ) ) {
-			$thumb_url           = wp_get_attachment_image_src( $thumb_id );
+			$thumb_url           = wp_get_attachment_image_src( $thumb_id, 'full' );
 			$event_info['image'] = isset( $thumb_url[0] ) ? $thumb_url[0] : null;
 		}
 		return $event_info;

@@ -45,3 +45,6 @@ Official Convert Cart Plugin For Woo Commerce.
 = 1.2.1
   * Tweak - Load initial convertcart script from cdn.convertcart.com.
   * Fix   - Added shopPageViewed event.
+
+= 1.2.2
+  * Fix   - Added original image in productViewed.
