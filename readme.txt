@@ -49,3 +49,4 @@ Official Convert Cart Plugin For Woo Commerce.
 = 1.2.2
   * Fix   - Added original image in productViewed and cartViewed items.
   * Fix   - Added productsSearched event.
+  * Fix   - Changed title to name in categoryViewed event.

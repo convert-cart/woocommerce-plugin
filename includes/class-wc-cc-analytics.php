@@ -174,7 +174,7 @@ class WC_CC_Analytics extends WC_Integration {
 		}
 		$cat_obj = $wp_query->get_queried_object();
 		if ( is_object( $cat_obj ) ) {
-			$event_info['title'] = $cat_obj->name;
+			$event_info['name']  = $cat_obj->name;
 			$event_info['url']   = get_category_link( $cat_obj->term_id );
 			$event_info['id']    = $cat_obj->term_id;
 			$event_info['count'] = $cat_obj->count;
