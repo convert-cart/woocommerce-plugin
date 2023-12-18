@@ -36,6 +36,66 @@ class WC_CC_Analytics extends WC_Integration {
 		add_action( 'wp_head', array( $this, 'cc_init' ) );
 		add_action( 'wp_footer', array( $this, 'addEvents' ) );
 		add_action( 'woocommerce_thankyou', array( $this, 'ordered' ) );
+        add_action(
+            'create_product_cat', function ( $term_id, $args ) {
+                do_action('woocommerce_admin_product_category_webhook_handler', array('term' => $term_id, 'topic' => 'category.created', 'category' => $args ));
+            }, 10, 3 
+        );
+        add_action(
+            'edit_product_cat', function ( $term_id, $args ) {
+                do_action('woocommerce_admin_product_category_webhook_handler', array('term' => $term_id, 'topic' => 'category.updated', 'category' => $args ));
+            }, 10, 3 
+        );
+        add_action(
+            'delete_product_cat', function ( $term_id, $tt_id = '' ) {
+                do_action('woocommerce_admin_product_category_webhook_handler', array('term' => $term_id, 'topic' => 'category.deleted'));
+            }, 10, 3 
+        );
+        add_action('woocommerce_admin_product_category_webhook_handler', array($this, 'sendCategoryRelatedNotification'), 10, 1);
+        add_action(
+            'rest_api_init', function () {
+                register_rest_route(
+                    'wc/v3', 'cc-version', array(
+                    'methods' => 'GET',
+                    'callback' => array($this, 'getVersionList'),
+                    'permission_callback' => array($this, 'permissionCallback'),
+                    )
+                );
+            }
+        );
+
+		// Filters.
+        add_filter(
+            'woocommerce_rest_product_object_query', function (array $args, \WP_REST_Request $request) {
+                $modified_after = $request->get_param('modified_after');
+        
+                if (!$modified_after) {
+                    return $args;
+                }
+        
+                $args['date_query'][0]['column'] = 'post_modified';
+                $args['date_query'][0]['after']  = $modified_after;
+        
+                return $args;
+        
+            }, 10, 2
+        );
+
+        add_filter(
+            'woocommerce_rest_orders_prepare_object_query', function (array $args, \WP_REST_Request $request) {
+                $modified_after = $request->get_param('modified_after');
+                if (!$modified_after) {
+                    return $args;
+                }
+        
+                $args['date_query'][0]['column'] = 'post_modified';
+                $args['date_query'][0]['after']  = $modified_after;
+                return $args;
+            }, 10, 2
+        );
+
+        add_filter('woocommerce_rest_customer_query', array( $this, 'addUpdatedSinceFilterToRESTApi' ), 10, 2);
+        add_filter('rest_product_collection_params', array( $this, 'maximum_api_filter'));
 	}
 
 	/**
@@ -338,4 +398,116 @@ class WC_CC_Analytics extends WC_Integration {
 			return 'default';
 		}
 	}
+
+    public function sendCategoryRelatedNotification($args)
+    {
+        global $wpdb;
+        
+        $id = isset($args['term']) ? $args['term'] : 0;
+        $topic = isset($args['topic']) ? $args['topic'] : null;
+        $body = $args;
+        $body['id'] = $id;
+
+        $data = explode( '.', $topic );
+        $orginalResource = "product";
+        $modifiedResource = $data[0];
+        $event = $data[1];
+        $sql = "SELECT webhook_id, `name`, delivery_url FROM {$wpdb->prefix}wc_webhooks WHERE topic='{$orginalResource}.{$event}' AND `name` LIKE 'convertcart%' AND delivery_url LIKE '%data-warehouse%'";
+        $results = $wpdb->get_results($sql, ARRAY_A);
+        
+        /*
+        ? Use this below line to log anything to the WordPress logs
+        ? error_log("----------------->>>>>>>>>>> debug <<<<<<<<<<<<<<----------------------{$sql}, {$results}");
+        */
+
+        foreach($results as $result) {
+            $modelDeliveryUrl = $result['delivery_url'];
+            $targetUrl = preg_replace("/{$orginalResource}/", "{$modifiedResource}", $modelDeliveryUrl);
+    
+            $opts = array(
+                'body'        => wp_json_encode($body),
+                'timeout'     => '120',
+                'redirection' => '5',
+                'httpversion' => '1.0',
+                'blocking'    => true,
+                'headers'     => array('Content-Type' => 'application/json'),
+                'cookies'     => array(),
+                'url' => $targetUrl,
+            );
+    
+            $response = wp_remote_post( $targetUrl, $opts );
+        }
+    }
+
+    public function maximum_api_filter($query_params) {
+        $query_params['per_page']["maximum"]=5000;
+        return $query_params;
+    }
+
+    /**
+     * Function get version list
+     *
+     * @param type mixed $request 
+     * 
+     * @return array
+     */
+    public function getVersionList($request)
+    {
+        global $wp_version;
+        global $woocommerce;
+        $info  = array();
+        $info["wp_version"] = $wp_version;
+        $info["wc_version"] =  is_object($woocommerce) ? $woocommerce->version : null;
+        return $info;
+    }
+
+    /**
+     * Function get version list
+     *
+     * @param type array $prepared_args 
+     * @param type mixed $request 
+     * 
+     * @return array
+     */
+    public function addUpdatedSinceFilterToRESTApi( $prepared_args, $request )
+    {
+        if ($request->get_param('modified_after')) {
+            $prepared_args['meta_query'] = array(
+            array(
+            'key'     => 'last_update',
+            'value'   => (int) strtotime($request->get_param('modified_after')),
+            'compare' => '>='
+            ),
+            );
+        }
+        return $prepared_args;
+    }
+
+    /**
+     * Function authentication of our custom endpoints
+     *
+     * @param type mixed $request 
+     * 
+     * @return bool
+     */
+    public function permissionCallback($request)
+    {
+        global $wpdb;
+        $queryparams = $request->get_params();
+        $key = $wpdb->get_row(
+            $wpdb->prepare(
+                "
+			SELECT consumer_secret
+			FROM {$wpdb->prefix}woocommerce_api_keys
+			WHERE consumer_secret = %s
+		", $queryparams['consumer_secret']
+            ), ARRAY_A
+        );
+
+        if ($key['consumer_secret']) {
+            return true;
+        }
+        return false;
+    }
+
 }
