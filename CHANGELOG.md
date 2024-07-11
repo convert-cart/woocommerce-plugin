@@ -1,6 +1,6 @@
 === Convert Cart Analytics ===
-Contributors: Aamir
-Tags: convertcart, analytics, woocommerce
+Contributors: Aamir, Senthil, Udhay
+Tags: convertcart, analytics, woocommerce, cro
 
 Official Convert Cart Plugin For Woo Commerce.
 
@@ -50,3 +50,7 @@ Official Convert Cart Plugin For Woo Commerce.
   * Fix   - Added original image in productViewed and cartViewed items.
   * Fix   - Added productsSearched event.
   * Fix   - Changed title to name in categoryViewed event.
+
+= 1.2.3
+  * Fix   - Added webhook for category changes.
+  * Fix   - Added filters for modified from.
