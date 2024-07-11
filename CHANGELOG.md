@@ -1,56 +1,72 @@
-=== Convert Cart Analytics ===
-Contributors: Aamir, Senthil, Udhay
-Tags: convertcart, analytics, woocommerce, cro
+# Changelog
 
-Official Convert Cart Plugin For Woo Commerce.
+All notable changes to this project will be documented in this file.
 
-== Changelog ==
+## [1.2.3] - 2023-12-18
+### Fixed
+- Added webhook for category changes.
+- Added filters for modified from.
 
-= 1.1.2
- * Tweak - Added image, url to cartViewed & checkoutViewed events.
- * Tweak - Removed sale_price and final_price from productViewed event.
- * Fix   - Fixed categoryViewed event.
+## [1.2.2] - 2019-11-07
+### Fixed
+- Added original image in productViewed and cartViewed items.
+- Added productsSearched event.
+- Changed title to name in categoryViewed event.
 
-= 1.1.3
-  * Tweak - Added date in meta_data.
-  * Tweak - Pass orderId as string in orderCompleted event.
+## [1.2.1] - 2019-10-31
+### Added
+- ShopPageViewed event.
 
-= 1.1.4
-  * Tweak - Added manage_stock, stock_quantity, is_in_stock in productViewed event.
+### Tweaked
+- Load initial convertcart script from cdn.convertcart.com.
 
-= 1.1.5
-  * Fix   - Fixed image url in cartViewed, checkoutViewed and orderCompleted event for variable product.
-  * Tweak - Removed manage_stock and stock_quantity from productViewed event for security reasons.
-  * Tweak - Added plugin_version in metaData of all events.
+## [1.2.0] - 2019-04-23
+### Tweaked
+- Updated convertcart init script.
+- Log events using ccLayer.
 
-= 1.1.6
-  * Tweak - Added "data-cfasync=false" attribute to script tag to disable cloudflare rocket loader.
+## [1.1.9] - 2019-01-03
+### Tweaked
+- Updated fieldname to clientId/domainId in configuration.
 
-= 1.1.7
-  * Fix   - Minor bug fixes.
-  * Fix   - Replaced deprecated wordpress/woocommerce functions.
-  * Tweak - Removed woocommerce/wordpress words in meta_data.
-  * Tweak - Removed categories from productViewed event.
+## [1.1.8] - 2018-12-07
+### Tweaked
+- Added currency in cart items.
 
-= 1.1.8
-  * Tweak - Added currency in cart items.
+## [1.1.7] - 2018-11-17
+### Fixed
+- Minor bug fixes.
+- Replaced deprecated WordPress/WooCommerce functions.
 
-= 1.1.9
-  * Tweak - Updated fieldname to clientId/domainId in configuration.
+### Tweaked
+- Removed woocommerce/wordpress words in meta_data.
+- Removed categories from productViewed event.
 
-= 1.2.0
-  * Tweak - Updated convertcart init script.
-  * Tweak - log events using ccLayer.
+## [1.1.6] - 2017-11-14
+### Tweaked
+- Added "data-cfasync=false" attribute to script tag to disable Cloudflare rocket loader.
 
-= 1.2.1
-  * Tweak - Load initial convertcart script from cdn.convertcart.com.
-  * Fix   - Added shopPageViewed event.
+## [1.1.5] - 2017-07-12
+### Fixed
+- Fixed image URL in cartViewed, checkoutViewed, and orderCompleted event for variable product.
 
-= 1.2.2
-  * Fix   - Added original image in productViewed and cartViewed items.
-  * Fix   - Added productsSearched event.
-  * Fix   - Changed title to name in categoryViewed event.
+### Tweaked
+- Removed manage_stock and stock_quantity from productViewed event for security reasons.
+- Added plugin_version in metaData of all events.
 
-= 1.2.3
-  * Fix   - Added webhook for category changes.
-  * Fix   - Added filters for modified from.
+## [1.1.4] - 2017-05-05
+### Tweaked
+- Added manage_stock, stock_quantity, is_in_stock in productViewed event.
+
+## [1.1.3] - 2017-05-05
+### Tweaked
+- Added date in meta_data.
+- Pass orderId as string in orderCompleted event.
+
+## [1.1.2] - 2016-11-29
+### Tweaked
+- Added image, URL to cartViewed & checkoutViewed events.
+- Removed sale_price and final_price from productViewed event.
+
+### Fixed
+- Fixed categoryViewed event.
