@@ -1,11 +1,14 @@
 <?php
 /**
  * Plugin Name: Convert Cart Analytics
- * Plugin URI: http://www.convertcart.com
+ * Plugin URI: https://www.convertcart.com/
  * Description: Official WooCommerce Plugin Of Convert Cart Analytics
  * Author: Convert Cart
- * Author URI: http://www.convertcart.com
  * Version: 1.2.3
+ * Tested up to: 6.5.5
+ * Stable Tag: 1.2.3
+ * License: GPLv2 or later
+ * Tags: conversion rate optimization, conversion, revenue boost
  *
  * @package WC_CC_Analytics
  */
