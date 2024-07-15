@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Convert Cart Analytics
  * Plugin URI: https://www.convertcart.com/
- * Description: Official WooCommerce Plugin Of Convert Cart Analytics
+ * Description: Official Convert Cart Analytics WordPress plugin that transforms abandoned carts into product pages, tracks user behavior, provides detailed analytics, and optimizes your store for increased conversions and revenue.
  * Author: Convert Cart
  * Version: 1.2.3
  * Tested up to: 6.5.5
