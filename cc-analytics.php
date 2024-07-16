@@ -1,9 +1,9 @@
 <?php
 /**
  * Plugin Name: Convert Cart Analytics
- * Plugin URI: https://www.convertcart.com/
  * Description: Official Convert Cart Analytics WordPress plugin that transforms abandoned carts into product pages, tracks user behavior, provides detailed analytics, and optimizes your store for increased conversions and revenue.
  * Author: Convert Cart
+ * Author URI: https://www.convertcart.com/
  * Version: 1.2.3
  * Tested up to: 6.5.5
  * Stable Tag: 1.2.3
@@ -24,7 +24,6 @@ defined( 'ABSPATH' ) || exit;
  * @return array Updated array of integrations.
  */
 function add_integration( $integrations ) {
-    // Define plugin version constant.
     if ( ! defined( 'CC_PLUGIN_VERSION' ) ) {
         define( 'CC_PLUGIN_VERSION', '1.2.3' );
     }
@@ -35,7 +34,7 @@ function add_integration( $integrations ) {
 
         if ( file_exists( $integration_path ) ) {
             include_once $integration_path;
-            $integrations[] = 'WC_Cc_Analytics';
+            $integrations[] = 'ConvertCart\Analytics\WC_CC_Analytics';
         } else {
             error_log( 'WC_CC_Analytics integration file not found: ' . $integration_path );
         }
@@ -43,5 +42,4 @@ function add_integration( $integrations ) {
 
     return $integrations;
 }
-add_filter( 'woocommerce_integrations', 'ConvertCart\\Analytics\\add_integration', 10 );
-
+add_filter( 'woocommerce_integrations', 'ConvertCart\Analytics\add_integration', 10 );

@@ -12,6 +12,13 @@ use WP_REST_Request;
 class WC_CC_Analytics extends \WC_Integration {
 
     /**
+     * Client ID.
+     *
+     * @var string
+     */
+    public $cc_client_id;
+
+    /**
      * Init and hook in the integration.
      */
     public function __construct() {
