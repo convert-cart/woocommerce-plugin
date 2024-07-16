@@ -38,11 +38,6 @@
             "dealerdirect/phpcodesniffer-composer-installer": true
         }
     },
-    "autoload": {
-        "psr-4": {
-            "ConvertCart\\Analytics\\": ""
-        }
-    },
     "minimum-stability": "dev",
     "prefer-stable": true
 }
