@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<ruleset name="CC Analytics">
+    <description>PHP CodeSniffer rules for CC Analytics WordPress plugin.</description>
+
+    <!-- Include the WordPress Coding Standards -->
+    <rule ref="WordPress">
+        <exclude name="Squiz.Commenting.ClassComment"/>
+    </rule>
+
+    <!-- Define the files and directories to include in the code sniffing process -->
+    <file>cc-analytics.php</file>
+    <file>includes/class-wc-cc-analytics.php</file>
+
+    <!-- Exclude any directories or files that should not be checked -->
+    <exclude-pattern>vendor/*</exclude-pattern>
+
+    <!-- 1 - less critical issues, 10 - most critical issues -->
+    <arg name="severity" value="6"/>
+</ruleset>
