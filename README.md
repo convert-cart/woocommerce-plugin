@@ -10,6 +10,8 @@
   - [Installation](#installation)
   - [Configure Domain Id](#configure-domain-id)
   - [Contact](#contact)
+  - [For Development](#for-development)
+    - [Using Code Sniffer](#using-code-sniffer)
 
 ## Introduction
 
@@ -37,3 +39,11 @@ Welcome to the WooCommerce Plugin by Convert Cart. Our plugin extends WooCommerc
 ## Contact
 
 Please contact [sales@convertcart.com](mailto:sales@convertcart.com) if any issues occur during the integration process.
+
+## For Development
+
+### Using Code Sniffer
+
+- After making any changes to the repository, run code sniffer to validate the code agaist WordPress standards using the following command,
+  `composer lint`
+- Fix the code either manually or by installing and using PHP CS Fixer available [here](https://github.com/PHP-CS-Fixer/PHP-CS-Fixer).
