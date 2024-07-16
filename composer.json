@@ -1,4 +1,30 @@
 {
+    "name": "convert-cart/wordpress-analytics",
+    "description": "Convert Cart Analytics plugin for frontend tracking and backend synchronization.",
+    "type": "wordpress-plugin",
+    "license": "GPL-3.0",
+    "homepage": "https://www.convertcart.com/",
+    "scripts": {
+        "lint": "./vendor/bin/phpcs ./"
+    },
+    "maintainers": [
+        {
+          "name": "Udhay kumar",
+          "email": "udhaya@convertcart.com"
+        }
+    ],
+    "authors": [
+        {
+          "name": "Aamir",
+          "email": "aamir@convertcart.com",
+          "role": "Developer"
+        },
+        {
+          "name": "Udhay kumar",
+          "email": "udhaya@convertcart.com",
+          "role": "Developer"
+        }
+      ],
     "require-dev": {
         "squizlabs/php_codesniffer": "^3.10.1",
         "wp-coding-standards/wpcs": "^3.0"
@@ -7,5 +33,12 @@
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true
         }
-    }
+    },
+    "autoload": {
+        "psr-4": {
+            "ConvertCart\\Analytics\\": ""
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }
