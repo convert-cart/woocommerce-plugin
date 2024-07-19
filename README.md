@@ -25,16 +25,17 @@ Welcome to the WooCommerce Plugin by Convert Cart. Our plugin extends WooCommerc
 
 ## Installation
 
-1. Download the latest release from the [releases](https://github.com/convert-cart/magento2-plugin/-/releases) page of the repository from GitHub.
-2. Upload the plugin files to the `/wp-content/plugins/` directory, or install it directly from the WordPress Plugin Manager.
-3. Activate the plugin through the 'Plugins' menu in WordPress.
+- *For Production Domains*: If your domain is set up with the production URL (app.convertcart.com), download the latest tag from the [tags](https://github.com/convert-cart/woocommerce-plugin/tags) page of the repository on GitHub.
+- *For Beta Domains*: If your domain is set up with the beta URL (app-beta.convertcart.com), download the latest tag that has the suffix `-beta` from the tags page of the repository on GitHub.
+- Upload the plugin files to the `/wp-content/plugins/` directory, or install it directly from the WordPress Plugin Manager.
+- Activate the plugin through the 'Plugins' menu in WordPress.
 
 ## Configure Domain Id
 
-1. After Installation, navigate to `Settings` > `Integration`.
-2. Enter Your Client Id / Domain Id (Your Customer Support Manager will provide this).
-3. Save Changes.
-4. If you have any caching plugin installed, then please clear its Cache.
+- After Installation, navigate to `Settings` > `Integration`.
+- Enter Your Client Id / Domain Id (Your Customer Support Manager will provide this).
+- Save Changes.
+- If you have any caching plugin installed, then please clear the cache.
 
 ## Contact
 
