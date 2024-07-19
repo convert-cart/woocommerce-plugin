@@ -15,5 +15,5 @@
     <exclude-pattern>vendor/*</exclude-pattern>
 
     <!-- 1 - less critical issues, 10 - most critical issues -->
-    <arg name="severity" value="6"/>
+    <arg name="severity" value="1"/>
 </ruleset>
