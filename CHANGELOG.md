@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.4] - 2024-08-28
+### Tweaks
+- Added a 'Debug' setting to control the inclusion of version meta data in tracking scripts.
+
 ## [1.2.3] - 2023-12-18
 ### Fixed
 - Added webhook for category changes.

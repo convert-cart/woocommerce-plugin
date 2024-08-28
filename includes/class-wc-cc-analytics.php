@@ -141,6 +141,13 @@ class WC_CC_Analytics extends \WC_Integration
                 'desc_tip'    => true,
                 'default'     => '',
             ),
+            'debug_mode' => array(
+                'title'       => __('Enable Debug Mode', 'woocommerce_cc_analytics'),
+                'type'        => 'checkbox',
+                'label'       => __('Enable Debugging for Meta Info', 'woocommerce_cc_analytics'),
+                'default'     => 'no',
+                'description' => __('If enabled, WooCommerce & WordPress plugin versions will be included in tracking metadata.', 'woocommerce_cc_analytics'),
+            ),
         );
     }
 
@@ -435,6 +442,8 @@ class WC_CC_Analytics extends \WC_Integration
         global $woocommerce;
         global $current_user;
 
+        $meta_data = [];
+
         if (is_object($current_user)) {
             if (isset($current_user->user_email)) {
                 $meta_data['customer_status'] = 'logged_in';
@@ -446,9 +455,14 @@ class WC_CC_Analytics extends \WC_Integration
 
         $meta_data['date']     = gmdate('Y-m-d H:i:s');
         $meta_data['currency'] = get_woocommerce_currency();
-        $meta_data['pv']       = is_object($woocommerce) ? $woocommerce->version : null;
-        $meta_data['wv']       = $wp_version;
-        $meta_data['pgv']      = CC_PLUGIN_VERSION;
+
+        $debug_mode = $this->get_option('debug_mode');
+        if ('yes' === $debug_mode) {
+            $meta_data['pv']  = is_object($woocommerce) ? $woocommerce->version : null;
+            $meta_data['wv']  = $wp_version;
+        }
+        $meta_data['pgv'] = defined('CC_PLUGIN_VERSION') ? CC_PLUGIN_VERSION : null;
+
         return $meta_data;
     }
 

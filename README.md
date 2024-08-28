@@ -1,6 +1,6 @@
 # Convert Cart WordPress Plugin
 
-![Version](https://img.shields.io/badge/version-1.2.3-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2.4-blue.svg)
 ![License](https://img.shields.io/badge/license-Proprietary-red.svg)
 
 ## Table of Contents
@@ -34,6 +34,7 @@ Welcome to the WooCommerce Plugin by Convert Cart. Our plugin extends WooCommerc
 
 - After Installation, navigate to `Settings` > `Integration`.
 - Enter Your Client Id / Domain Id (Your Customer Support Manager will provide this).
+- Select "Enable Debug Mode" if you wanted to track WooCommerce & WordPress plugin information to the tracking script.
 - Save Changes.
 - If you have any caching plugin installed, then please clear the cache.
 
