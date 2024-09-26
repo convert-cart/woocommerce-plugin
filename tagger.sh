@@ -123,14 +123,23 @@ if [ "$choice" = "2" ] || [ "$choice" = "3" ]; then
     fi
 fi
 
-# Update to beta version in composer.json
-printf "${YELLOW}Updating composer.json with version %s...${NC}\n" "$BETA_VERSION"
-sed -i "s/\"version\": \"$MAIN_VERSION\"/\"version\": \"$BETA_VERSION\"/" composer.json || handle_error "Failed to update composer.json for beta"
+# Update version in composer.json
+printf "${YELLOW}Updating composer.json with version %s...${NC}\n" "$MAIN_VERSION"
+sed -i "s/\"version\": \".*\"/\"version\": \"$MAIN_VERSION\"/" composer.json || handle_error "Failed to update composer.json"
 
-# Update stable tag and version in README.md for beta version
-printf "${YELLOW}Updating stable tag and version in README.md for beta...${NC}\n"
-sed -i "s/Stable tag: .*/Stable tag: $BETA_VERSION/" README.md || handle_error "Failed to update stable tag for beta"
-sed -i "s/badge\/v.*\"/badge\/v$BETA_VERSION\"/" README.md || handle_error "Failed to update badge version in README.md for beta"
+# Update version and stable tag in README.md
+printf "${YELLOW}Updating version and stable tag in README.md...${NC}\n"
+sed -i "s/^Stable tag: .*/Stable tag: $MAIN_VERSION/" README.md || handle_error "Failed to update stable tag in README.md"
+sed -i "s/badge\/v[0-9.]*\"/badge\/v$MAIN_VERSION\"/" README.md || handle_error "Failed to update badge version in README.md"
+
+# Update version in plugin header comment in cc-analytics.php
+printf "${YELLOW}Updating version in cc-analytics.php...${NC}\n"
+sed -i "s/^ \* Version: .*/ \* Version: $MAIN_VERSION/" cc-analytics.php || handle_error "Failed to update version in cc-analytics.php"
+
+# Validate that the CHANGELOG.md is updated
+if ! grep -q "$MAIN_VERSION" CHANGELOG.md; then
+    handle_error "CHANGELOG.md is not updated with version $MAIN_VERSION"
+fi
 
 # Commit changes for production tag if chosen
 if [ "$choice" = "1" ] || [ "$choice" = "3" ]; then
@@ -147,16 +156,7 @@ sed -i "s/\"version\": \"$MAIN_VERSION\"/\"version\": \"$BETA_VERSION\"/" compos
 # Update stable tag and version in README.md for beta version
 printf "${YELLOW}Updating stable tag and version in README.md for beta...${NC}\n"
 sed -i "s/Stable tag: .*/Stable tag: $BETA_VERSION/" README.md || handle_error "Failed to update stable tag for beta"
-sed -i "s/badge\/v.*\"/badge\/v$BETA_VERSION\"/" README.md || handle_error "Failed to update badge version in README.md for beta"
-
-# Update version in plugin header comment in cc-analytics.php
-printf "${YELLOW}Updating version in cc-analytics.php...${NC}\n"
-sed -i "s/^ \* Version: .*/ \* Version: $MAIN_VERSION/" cc-analytics.php || handle_error "Failed to update version in cc-analytics.php"
-
-# Validate that the CHANGELOG.md is updated
-if ! grep -q "$MAIN_VERSION" CHANGELOG.md; then
-    handle_error "CHANGELOG.md is not updated with version $MAIN_VERSION"
-fi
+sed -i "s/badge\/v[0-9.]*\"/badge\/v$BETA_VERSION\"/" README.md || handle_error "Failed to update badge version in README.md for beta"
 
 # Commit changes for beta tag if chosen
 if [ "$choice" = "2" ] || [ "$choice" = "3" ]; then
