@@ -43,6 +43,19 @@ if [ -z "$MAIN_VERSION" ]; then
     handle_error "Please provide a version number. Usage: ./tagger.sh VERSION_NUMBER"
 fi
 
+# Check for uncommitted changes and warn the user
+if [ -n "$(git status --porcelain)" ]; then
+    printf "${RED}Warning: You have uncommitted changes!${NC}\n"
+    printf "${RED}All your local changes will be lost if you continue.${NC}\n"
+    printf "Please commit your changes before proceeding.\n"
+    printf "Do you want to continue and discard all changes? (y/n): "
+    read response
+    if [ "$response" != "y" ]; then
+        printf "${YELLOW}Exiting without making any changes.${NC}\n"
+        exit 0
+    fi
+fi
+
 # Prompt for tag creation options
 echo "Select the tags you want to create:"
 echo "1) Production tag"
