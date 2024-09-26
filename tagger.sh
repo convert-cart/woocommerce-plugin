@@ -129,13 +129,13 @@ sed -i "s/\"version\": \".*\"/\"version\": \"$MAIN_VERSION\"/" composer.json || 
 
 # Update version and stable tag in README.md
 printf "${YELLOW}Updating version and stable tag in README.md...${NC}\n"
-sed -i "s/^Stable Tag: .*/Stable Tag: $MAIN_VERSION/" README.md || handle_error "Failed to update stable tag in README.md"
+sed -i "s/^Stable tag: .*/Stable tag: $MAIN_VERSION/" README.md || handle_error "Failed to update stable tag in README.md"
 sed -i "s/badge\/v[0-9.]*\"/badge\/v$MAIN_VERSION\"/" README.md || handle_error "Failed to update badge version in README.md"
 
 # Update version, stable tag, and CC_PLUGIN_VERSION in cc-analytics.php
 printf "${YELLOW}Updating version, stable tag, and CC_PLUGIN_VERSION in cc-analytics.php...${NC}\n"
 sed -i "s/^ \* Version: .*/ \* Version: $MAIN_VERSION/" cc-analytics.php || handle_error "Failed to update version in cc-analytics.php"
-sed -i "s/^ \* Stable Tag: .*/ \* Stable Tag: $MAIN_VERSION/" cc-analytics.php || handle_error "Failed to update stable tag in cc-analytics.php"
+sed -i "s/^[[:space:]]*\* Stable Tag: .*/ \* Stable Tag: $MAIN_VERSION/" cc-analytics.php || handle_error "Failed to update stable tag in cc-analytics.php"
 sed -i "s/define('CC_PLUGIN_VERSION', '.*');/define('CC_PLUGIN_VERSION', '$MAIN_VERSION');/" cc-analytics.php || handle_error "Failed to update CC_PLUGIN_VERSION in cc-analytics.php"
 
 # Validate that the CHANGELOG.md is updated
@@ -158,12 +158,12 @@ sed -i "s/\"version\": \"$MAIN_VERSION\"/\"version\": \"$BETA_VERSION\"/" compos
 # Update stable tag, version, and CC_PLUGIN_VERSION in cc-analytics.php for beta version
 printf "${YELLOW}Updating stable tag, version, and CC_PLUGIN_VERSION in cc-analytics.php for beta...${NC}\n"
 sed -i "s/^ \* Version: .*/ \* Version: $BETA_VERSION/" cc-analytics.php || handle_error "Failed to update version for beta"
-sed -i "s/^ \* Stable Tag: .*/ \* Stable Tag: $BETA_VERSION/" cc-analytics.php || handle_error "Failed to update stable tag for beta"
+sed -i "s/^[[:space:]]*\* Stable Tag: .*/ \* Stable Tag: $BETA_VERSION/" cc-analytics.php || handle_error "Failed to update stable tag for beta"
 sed -i "s/define('CC_PLUGIN_VERSION', '.*');/define('CC_PLUGIN_VERSION', '$BETA_VERSION');/" cc-analytics.php || handle_error "Failed to update CC_PLUGIN_VERSION for beta"
 
 # Update stable tag and version in README.md for beta version
 printf "${YELLOW}Updating stable tag and version in README.md for beta...${NC}\n"
-sed -i "s/Stable Tag: .*/Stable Tag: $BETA_VERSION/" README.md || handle_error "Failed to update stable tag for beta"
+sed -i "s/Stable tag: .*/Stable tag: $BETA_VERSION/" README.md || handle_error "Failed to update stable tag for beta"
 sed -i "s/badge\/v[0-9.]*\"/badge\/v$BETA_VERSION\"/" README.md || handle_error "Failed to update badge version in README.md for beta"
 
 # Commit changes for beta tag if chosen
