@@ -49,3 +49,9 @@ Please contact [sales@convertcart.com](mailto:sales@convertcart.com) if any issu
 - After making any changes to the repository, run code sniffer to validate the code agaist WordPress standards using the following command,
   `composer lint`
 - Fix the code either manually or by installing and using PHP CS Fixer available [here](https://github.com/PHP-CS-Fixer/PHP-CS-Fixer).
+
+### Tag Creation
+
+After making any changes to the master branch, you can create new version tags (for beta and production) by running the following command:
+  `sh tagger.sh VERSION_NUMBER`
+Make sure to replace VERSION_NUMBER with the actual version number you want to create.
