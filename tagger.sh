@@ -100,54 +100,37 @@ confirm_tag_deletion() {
     return 0
 }
 
-# Check for existing remote tags and handle accordingly
-handle_existing_tag() {
-    local TAG=$1
-    if check_remote_tag_exists "$TAG"; then
-        creation_date=$(get_tag_creation_date "$TAG")
-        printf "${YELLOW}Tag '$TAG' already exists on remote (created on: $creation_date).\nDo you want to delete it and recreate it? (y/n): ${NC}"
-        read response
-        if [ "$response" = "y" ]; then
-            printf "${YELLOW}Deleting tag $TAG from remote...${NC}\n"
-            git push origin ":refs/tags/$TAG" || handle_error "Failed to delete existing tag $TAG from remote"
-        else
-            printf "${GREEN}Skipping creation of tag %s.${NC}\n" "$TAG"
-            return 1  # Skip further tag creation if the user opts to not delete
-        fi
-    fi
-    return 0  # Return 0 to indicate that we can proceed with tag creation
-}
-
 # Check for existing remote tags
 if [ "$choice" = "1" ] || [ "$choice" = "3" ]; then
-    if ! handle_existing_tag "$MAIN_VERSION"; then
-        exit 0
+    if check_remote_tag_exists "$MAIN_VERSION"; then
+        creation_date=$(get_tag_creation_date "$MAIN_VERSION")
+        if confirm_tag_deletion "$MAIN_VERSION" "$creation_date"; then
+            git tag -d "$MAIN_VERSION" || handle_error "Failed to delete existing production tag"
+        else
+            printf "${GREEN}Skipping creation of production tag %s.${NC}\n" "$MAIN_VERSION"
+        fi
     fi
 fi
 
 if [ "$choice" = "2" ] || [ "$choice" = "3" ]; then
-    if ! handle_existing_tag "$BETA_VERSION"; then
-        exit 0
+    if check_remote_tag_exists "$BETA_VERSION"; then
+        creation_date=$(get_tag_creation_date "$BETA_VERSION")
+        if confirm_tag_deletion "$BETA_VERSION" "$creation_date"; then
+            git tag -d "$BETA_VERSION" || handle_error "Failed to delete existing beta tag"
+        else
+            printf "${GREEN}Skipping creation of beta tag %s.${NC}\n" "$BETA_VERSION"
+        fi
     fi
 fi
 
-# Update version in composer.json
-printf "${YELLOW}Updating composer.json with version %s...${NC}\n" "$MAIN_VERSION"
-sed -i "s/\"version\": \".*\"/\"version\": \"$MAIN_VERSION\"/" composer.json || handle_error "Failed to update composer.json"
+# Update to beta version in composer.json
+printf "${YELLOW}Updating composer.json with version %s...${NC}\n" "$BETA_VERSION"
+sed -i "s/\"version\": \"$MAIN_VERSION\"/\"version\": \"$BETA_VERSION\"/" composer.json || handle_error "Failed to update composer.json for beta"
 
-# Update version and stable tag in README.md
-printf "${YELLOW}Updating version and stable tag in README.md...${NC}\n"
-sed -i "s/^Stable tag: .*$/Stable tag: $MAIN_VERSION/" README.md || handle_error "Failed to update stable tag in README.md"
-sed -i "s/badge\/v.*\"/badge\/v$MAIN_VERSION\"/" README.md || handle_error "Failed to update badge version in README.md"
-
-# Update version in plugin header comment in cc-analytics.php
-printf "${YELLOW}Updating version in cc-analytics.php...${NC}\n"
-sed -i "s/^ \* Version: .*/ \* Version: $MAIN_VERSION/" cc-analytics.php || handle_error "Failed to update version in cc-analytics.php"
-
-# Validate that the CHANGELOG.md is updated
-if ! grep -q "$MAIN_VERSION" CHANGELOG.md; then
-    handle_error "CHANGELOG.md is not updated with version $MAIN_VERSION"
-fi
+# Update stable tag and version in README.md for beta version
+printf "${YELLOW}Updating stable tag and version in README.md for beta...${NC}\n"
+sed -i "s/Stable tag: .*/Stable tag: $BETA_VERSION/" README.md || handle_error "Failed to update stable tag for beta"
+sed -i "s/badge\/v.*\"/badge\/v$BETA_VERSION\"/" README.md || handle_error "Failed to update badge version in README.md for beta"
 
 # Commit changes for production tag if chosen
 if [ "$choice" = "1" ] || [ "$choice" = "3" ]; then
@@ -161,10 +144,13 @@ fi
 printf "${YELLOW}Updating composer.json with version %s...${NC}\n" "$BETA_VERSION"
 sed -i "s/\"version\": \"$MAIN_VERSION\"/\"version\": \"$BETA_VERSION\"/" composer.json || handle_error "Failed to update composer.json for beta"
 
-# Update stable tag and version in README.md for beta version
-printf "${YELLOW}Updating stable tag and version in README.md for beta...${NC}\n"
-sed -i "s/Stable tag: .*/Stable tag: $BETA_VERSION/" README.md || handle_error "Failed to update stable tag for beta"
-sed -i "s/badge\/v.*\"/badge\/v$BETA_VERSION\"/" README.md || handle_error "Failed to update badge version in README.md for beta"
+# Update setup_version in module.xml for beta version
+printf "${YELLOW}Updating setup_version in module.xml for beta version...${NC}\n"
+sed -i "s/setup_version=\"$MAIN_VERSION\"/setup_version=\"$BETA_VERSION\"/" etc/module.xml || handle_error "Failed to update module.xml for beta"
+
+# Modify domain in init.phtml for beta
+printf "${YELLOW}Updating domain in init.phtml for beta...${NC}\n"
+sed -i 's/cdn.convertcart.com/cdn-beta.convertcart.com/' view/frontend/templates/init.phtml || handle_error "Failed to update domain in init.phtml for beta"
 
 # Commit changes for beta tag if chosen
 if [ "$choice" = "2" ] || [ "$choice" = "3" ]; then
