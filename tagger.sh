@@ -100,26 +100,32 @@ confirm_tag_deletion() {
     return 0
 }
 
+# Check for existing remote tags and handle accordingly
+handle_existing_tag() {
+    local TAG=$1
+    if check_remote_tag_exists "$TAG"; then
+        creation_date=$(get_tag_creation_date "$TAG")
+        if confirm_tag_deletion "$TAG" "$creation_date"; then
+            printf "${YELLOW}Deleting tag $TAG from remote...${NC}\n"
+            git push origin ":refs/tags/$TAG" || handle_error "Failed to delete existing tag $TAG from remote"
+        else
+            printf "${GREEN}Skipping creation of tag %s.${NC}\n" "$TAG"
+            return 1
+        fi
+    fi
+    return 0
+}
+
 # Check for existing remote tags
 if [ "$choice" = "1" ] || [ "$choice" = "3" ]; then
-    if check_remote_tag_exists "$MAIN_VERSION"; then
-        creation_date=$(get_tag_creation_date "$MAIN_VERSION")
-        if confirm_tag_deletion "$MAIN_VERSION" "$creation_date"; then
-            git tag -d "$MAIN_VERSION" || handle_error "Failed to delete existing production tag"
-        else
-            printf "${GREEN}Skipping creation of production tag %s.${NC}\n" "$MAIN_VERSION"
-        fi
+    if ! handle_existing_tag "$MAIN_VERSION"; then
+        exit 0
     fi
 fi
 
 if [ "$choice" = "2" ] || [ "$choice" = "3" ]; then
-    if check_remote_tag_exists "$BETA_VERSION"; then
-        creation_date=$(get_tag_creation_date "$BETA_VERSION")
-        if confirm_tag_deletion "$BETA_VERSION" "$creation_date"; then
-            git tag -d "$BETA_VERSION" || handle_error "Failed to delete existing beta tag"
-        else
-            printf "${GREEN}Skipping creation of beta tag %s.${NC}\n" "$BETA_VERSION"
-        fi
+    if ! handle_existing_tag "$BETA_VERSION"; then
+        exit 0
     fi
 fi
 
