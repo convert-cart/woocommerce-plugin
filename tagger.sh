@@ -105,15 +105,17 @@ handle_existing_tag() {
     local TAG=$1
     if check_remote_tag_exists "$TAG"; then
         creation_date=$(get_tag_creation_date "$TAG")
-        if confirm_tag_deletion "$TAG" "$creation_date"; then
+        printf "${YELLOW}Tag '$TAG' already exists on remote (created on: $creation_date).\nDo you want to delete it and recreate it? (y/n): ${NC}"
+        read response
+        if [ "$response" = "y" ]; then
             printf "${YELLOW}Deleting tag $TAG from remote...${NC}\n"
             git push origin ":refs/tags/$TAG" || handle_error "Failed to delete existing tag $TAG from remote"
         else
             printf "${GREEN}Skipping creation of tag %s.${NC}\n" "$TAG"
-            return 1
+            return 1  # Skip further tag creation if the user opts to not delete
         fi
     fi
-    return 0
+    return 0  # Return 0 to indicate that we can proceed with tag creation
 }
 
 # Check for existing remote tags
