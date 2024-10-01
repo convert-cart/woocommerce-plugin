@@ -7,7 +7,7 @@
   - [Table of Contents](#table-of-contents)
   - [Introduction](#introduction)
   - [Features](#features)
-  - [Installation](#installation)
+  - [Installation Instructions](#installation-instructions)
   - [Configure Domain Id](#configure-domain-id)
   - [Contact](#contact)
   - [For Development](#for-development)
@@ -23,12 +23,25 @@ Welcome to the WooCommerce Plugin by Convert Cart. Our plugin extends WooCommerc
 - Token generation for synchronizing product/order/customer/category data to Convert Cart servers for recommendations.
 - Adding webhooks through the official REST API and plugin code.
 
-## Installation
+## Installation Instructions
 
-- *For Production Domains*: If your domain is set up with the production URL (app.convertcart.com), download the latest tag from the [tags](https://github.com/convert-cart/woocommerce-plugin/tags) page of the repository on GitHub.
-- *For Beta Domains*: If your domain is set up with the beta URL (app-beta.convertcart.com), download the latest tag that has the suffix `-beta` from the tags page of the repository on GitHub.
-- Upload the plugin files to the `/wp-content/plugins/` directory, or install it directly from the WordPress Plugin Manager.
-- Activate the plugin through the 'Plugins' menu in WordPress.
+### For Production Domains
+If your domain is rocking the production URL (`app.convertcart.com`):
+1. Download the latest release from the [Tags](https://github.com/convert-cart/woocommerce-plugin/tags) page on GitHub.
+
+### For Beta Domains
+If your domain is set up with the beta URL (`app-beta.convertcart.com`):
+1. Download the latest tag that includes the `-beta` suffix from the [Tags](https://github.com/convert-cart/woocommerce-plugin/tags) page.
+
+### Installation Process
+1. **If the client is installing**:  
+   - Hand over the downloaded plugin file and let them work their magic 🎩.
+   
+2. **If you’ve got the admin credentials**:  
+   - Install the plugin directly through the WordPress Plugin Manager, usually located at `https://www.example.com/wp-admin/plugins.php`.
+   - Alternatively, you can also upload the unzipped plugin files to the `/wp-content/plugins/` directory using FTP.
+   
+3. Once that's done, head to the 'Plugins' menu in WordPress and activate the plugin.
 
 ## Configure Domain Id
 
