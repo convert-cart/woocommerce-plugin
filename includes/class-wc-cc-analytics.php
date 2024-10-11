@@ -126,6 +126,16 @@ class WC_CC_Analytics extends \WC_Integration
 
         add_filter('woocommerce_rest_customer_query', array( $this, 'addUpdatedSinceFilterToRESTApi' ), 10, 2);
         add_filter('rest_product_collection_params', array( $this, 'maximum_api_filter'));
+        add_action( 'woocommerce_review_order_before_submit', array( $this, 'add_sms_consent_checkbox' ));
+        add_action( 'woocommerce_checkout_create_order', array( $this, 'save_sms_consent_to_order_or_customer'), 10, 2 );
+        add_action( 'woocommerce_created_customer', array( $this, 'save_sms_consent_when_account_is_created'), 10, 3 );
+        add_action( 'woocommerce_edit_account_form', array( $this, 'add_sms_consent_checkbox_to_account_page') );
+        add_action( 'woocommerce_save_account_details', array( $this, 'save_sms_consent_from_account_page'), 12, 1 );
+        add_action( 'woocommerce_register_form', array( $this, 'add_sms_consent_to_registration_form') );
+        add_action( 'woocommerce_created_customer', array( $this, 'save_sms_consent_from_registration_form'), 10, 1 );
+        add_action( 'woocommerce_created_customer', array( $this, 'update_consent_from_previous_orders'), 20, 3 );
+        add_action('admin_menu', array( $this, 'add_convert_cart_menu'));
+        add_action('admin_enqueue_scripts', array( $this, 'enqueue_codemirror_assets'));
     }
 
     /**
@@ -147,6 +157,13 @@ class WC_CC_Analytics extends \WC_Integration
                 'label'       => __('Enable Debugging for Meta Info', 'woocommerce_cc_analytics'),
                 'default'     => 'no',
                 'description' => __('If enabled, WooCommerce & WordPress plugin versions will be included in tracking metadata.', 'woocommerce_cc_analytics'),
+            ),
+            'enable_sms_consent' => array(  // New checkbox for enabling/disabling SMS consent
+                'title'       => __('Enable SMS Consent', 'woocommerce_cc_analytics'),
+                'type'        => 'checkbox',
+                'label'       => __('Enable SMS Consent for Customer Communication', 'woocommerce_cc_analytics'),
+                'default'     => 'no',
+                'description' => __('If enabled, customers will be able to provide consent for receiving SMS communications.', 'woocommerce_cc_analytics'),
             ),
         );
     }
@@ -605,4 +622,255 @@ class WC_CC_Analytics extends \WC_Integration
         return false;
     }
 
+    function add_sms_consent_checkbox() {
+        $options = get_option('woocommerce_cc_analytics_settings');
+        if (isset($options['enable_sms_consent']) && $options['enable_sms_consent'] === 'yes') {
+            $default_html = '
+<div class="sms-consent-checkbox">
+	<label for="sms_consent">
+		<input type="checkbox" name="sms_consent" id="sms_consent" ' . checked( $sms_consent, 'yes', false ) . ' />
+		I consent to receive SMS communications.
+	</label>
+</div>';
+
+            $checkout_html = get_option('cc_sms_consent_checkout_html', $default_html);
+            echo $checkout_html;
+        }
+    }
+
+    function save_sms_consent_to_order_or_customer( $order, $data ) {
+        $options = get_option( 'woocommerce_cc_analytics_settings' );
+        if ( isset( $options['enable_sms_consent'] ) && $options['enable_sms_consent'] === 'yes' ) {
+            if ( is_user_logged_in() ) {
+                // Logged-in users: Save consent to user meta
+                $user_id = get_current_user_id();
+                if ( isset( $_POST['sms_consent'] ) ) {
+                    update_user_meta( $user_id, 'sms_consent', 'yes' );
+                } else {
+                    update_user_meta( $user_id, 'sms_consent', 'no' );
+                }
+            } else {
+                // Guest users: Save consent to order meta
+                if ( isset( $_POST['sms_consent'] ) ) {
+                    $order->update_meta_data( 'sms_consent', 'yes' );
+                } else {
+                    $order->update_meta_data( 'sms_consent', 'no' );
+                }
+            }
+        }
+    }
+
+    function save_sms_consent_when_account_is_created( $customer_id, $new_customer_data, $password_generated ) {
+        $options = get_option( 'woocommerce_cc_analytics_settings' );
+        if ( isset( $options['enable_sms_consent'] ) && $options['enable_sms_consent'] === 'yes' ) {
+            if ( isset( $_POST['sms_consent'] ) ) {
+                update_user_meta( $customer_id, 'sms_consent', 'yes' );
+            } else {
+                update_user_meta( $customer_id, 'sms_consent', 'no' );
+            }
+        }
+    }
+
+    function add_sms_consent_checkbox_to_account_page() {
+        $options = get_option('woocommerce_cc_analytics_settings');
+        if (isset($options['enable_sms_consent']) && $options['enable_sms_consent'] === 'yes') {
+            $user_id = get_current_user_id();
+            $sms_consent = get_user_meta($user_id, 'sms_consent', true);
+
+            $default_html = '
+<p class="form-row form-row-wide">
+	<label for="sms_consent">' . esc_html__('I consent to receive SMS communications', 'woocommerce') . '</label>
+	<input type="checkbox" name="sms_consent" id="sms_consent" ' . checked($sms_consent, 'yes', false) . ' />
+</p>';
+
+            $account_html = get_option('cc_sms_consent_account_html', $default_html);
+
+            echo $account_html;
+        }
+    }
+
+    function save_sms_consent_from_account_page( $user_id ) {
+        $options = get_option( 'woocommerce_cc_analytics_settings' );
+        if ( isset( $options['enable_sms_consent'] ) && $options['enable_sms_consent'] === 'yes' ) {
+            if ( isset( $_POST['sms_consent'] ) ) {
+                update_user_meta( $user_id, 'sms_consent', 'yes' );
+            } else {
+                update_user_meta( $user_id, 'sms_consent', 'no' );
+            }
+        }
+    }
+
+    function add_sms_consent_to_registration_form() {
+        $options = get_option('woocommerce_cc_analytics_settings');
+        if (isset($options['enable_sms_consent']) && $options['enable_sms_consent'] === 'yes') {
+            // Default HTML as a string
+            $default_html = '
+<p class="form-row form-row-wide">
+	<label for="sms_consent">' . esc_html__('I consent to receive SMS communications', 'woocommerce') . '</label>
+	<input type="checkbox" name="sms_consent" id="sms_consent" />
+</p>';
+
+            // Get custom HTML or use default
+            $registration_html = get_option('cc_sms_consent_registration_html', $default_html);
+
+            echo $registration_html;
+        }
+    }
+
+    function save_sms_consent_from_registration_form( $customer_id ) {
+        $options = get_option( 'woocommerce_cc_analytics_settings' );
+        if ( isset( $options['enable_sms_consent'] ) && $options['enable_sms_consent'] === 'yes' ) {
+            if ( isset( $_POST['sms_consent'] ) ) {
+                update_user_meta( $customer_id, 'sms_consent', 'yes' );
+            } else {
+                update_user_meta( $customer_id, 'sms_consent', 'no' );
+            }
+        }
+    }
+
+    function update_consent_from_previous_orders( $customer_id, $new_customer_data, $password_generated ) {
+        $options = get_option( 'woocommerce_cc_analytics_settings' );
+        if ( isset( $options['enable_sms_consent'] ) && $options['enable_sms_consent'] === 'yes' ) {
+            $user_email = $new_customer_data['user_email'];
+
+            // Search for guest orders placed with the same email
+            $orders = wc_get_orders( array(
+                'billing_email' => $user_email,
+                'limit'         => -1,  // Retrieve all orders
+                'customer_id'   => 0,   // Only guest orders
+            ) );
+
+            foreach ( $orders as $order ) {
+                $sms_consent = $order->get_meta( 'sms_consent' );
+
+                // If the guest had consented in any order, save it to the user profile
+                if ( $sms_consent === 'yes' ) {
+                    update_user_meta( $customer_id, 'sms_consent', 'yes' );
+                    break;  // Exit the loop once consent is found
+                }
+            }
+        }
+    }
+
+    function add_convert_cart_menu() {
+        $options = get_option('woocommerce_cc_analytics_settings');
+
+        // Only show the menu if SMS consent is enabled
+        if (isset($options['enable_sms_consent']) && $options['enable_sms_consent'] === 'yes') {
+            add_menu_page(
+                __('Convert Cart', 'woocommerce_cc_analytics'),
+                __('Convert Cart', 'woocommerce_cc_analytics'),
+                'manage_options',
+                'convert-cart-settings',
+                array( $this, 'render_convert_cart_settings_page'),
+                'dashicons-edit',
+                60
+            );
+        }
+    }
+
+    function enqueue_codemirror_assets() {
+        wp_enqueue_code_editor(array('type' => 'text/html'));
+        wp_enqueue_script('wp-theme-plugin-editor');
+        wp_enqueue_style('wp-codemirror');
+    }
+
+    function render_convert_cart_settings_page() {
+        if (isset($_POST['save_convert_cart_html'])) {
+            // PHP Validation to ensure the sms_consent checkbox is present
+            if (
+                strpos($_POST['cc_sms_consent_checkout_html'], 'name="sms_consent"') === false ||
+                strpos($_POST['cc_sms_consent_registration_html'], 'name="sms_consent"') === false ||
+                strpos($_POST['cc_sms_consent_account_html'], 'name="sms_consent"') === false
+            ) {
+                echo '<div class="error"><p>Error: The "sms_consent" checkbox must be present in all snippets.</p></div>';
+            } else {
+                // Save custom HTML snippets to options if valid
+                update_option('cc_sms_consent_checkout_html', stripslashes($_POST['cc_sms_consent_checkout_html']));
+                update_option('cc_sms_consent_registration_html', stripslashes($_POST['cc_sms_consent_registration_html']));
+                update_option('cc_sms_consent_account_html', stripslashes($_POST['cc_sms_consent_account_html']));
+    
+                echo '<div class="updated"><p>HTML Snippets saved successfully!</p></div>';
+            }
+        }
+    
+        // Default HTML snippets as fallback
+        $default_checkout_html = '
+		<div class="sms-consent-checkbox">
+			<label for="sms_consent">
+				<input type="checkbox" name="sms_consent" id="sms_consent" />
+				I consent to receive SMS communications.
+			</label>
+		</div>';
+    
+        $default_registration_html = '
+        <p class="form-row form-row-wide">
+            <label for="sms_consent">' . esc_html__('I consent to receive SMS communications', 'woocommerce') . '</label>
+            <input type="checkbox" name="sms_consent" id="sms_consent" />
+        </p>';
+    
+        $default_account_html = '
+        <p class="form-row form-row-wide">
+            <label for="sms_consent">' . esc_html__('I consent to receive SMS communications', 'woocommerce') . '</label>
+            <input type="checkbox" name="sms_consent" id="sms_consent" />
+        </p>';
+    
+        // Get the saved HTML snippets or use defaults
+        $checkout_html = get_option('cc_sms_consent_checkout_html', $default_checkout_html);
+        $registration_html = get_option('cc_sms_consent_registration_html', $default_registration_html);
+        $account_html = get_option('cc_sms_consent_account_html', $default_account_html);
+    
+        ?>
+        <div class="wrap">
+            <h1><?php _e('Convert Cart HTML Snippets', 'woocommerce_cc_analytics'); ?></h1>
+            <form method="POST" id="convert-cart-form">
+                <h2><?php _e('Checkout Page HTML', 'woocommerce_cc_analytics'); ?></h2>
+                <textarea id="cc_sms_consent_checkout_html" name="cc_sms_consent_checkout_html" rows="10" cols="50"><?php echo esc_textarea($checkout_html); ?></textarea>
+    
+                <h2><?php _e('Registration Page HTML', 'woocommerce_cc_analytics'); ?></h2>
+                <textarea id="cc_sms_consent_registration_html" name="cc_sms_consent_registration_html" rows="10" cols="50"><?php echo esc_textarea($registration_html); ?></textarea>
+    
+                <h2><?php _e('My Account Page HTML', 'woocommerce_cc_analytics'); ?></h2>
+                <textarea id="cc_sms_consent_account_html" name="cc_sms_consent_account_html" rows="10" cols="50"><?php echo esc_textarea($account_html); ?></textarea>
+    
+                <p><input type="submit" name="save_convert_cart_html" value="Save HTML Snippets" class="button-primary"></p>
+            </form>
+        </div>
+    
+        <script>
+            jQuery(document).ready(function($) {
+                // Initialize CodeMirror for each textarea
+                var editor_settings = wp.codeEditor.defaultSettings ? _.clone( wp.codeEditor.defaultSettings ) : {};
+                editor_settings.codemirror = _.extend(
+                    {},
+                    editor_settings.codemirror,
+                    {
+                        mode: 'htmlmixed',
+                        indentUnit: 2,
+                        tabSize: 2,
+                        lineNumbers: true,
+                        theme: 'default',
+                    }
+                );
+                wp.codeEditor.initialize($('#cc_sms_consent_checkout_html'), editor_settings);
+                wp.codeEditor.initialize($('#cc_sms_consent_registration_html'), editor_settings);
+                wp.codeEditor.initialize($('#cc_sms_consent_account_html'), editor_settings);
+    
+                // JavaScript validation to check for sms_consent checkbox
+                $('#convert-cart-form').on('submit', function(e) {
+                    var checkoutHtml = $('#cc_sms_consent_checkout_html').val();
+                    var registrationHtml = $('#cc_sms_consent_registration_html').val();
+                    var accountHtml = $('#cc_sms_consent_account_html').val();
+    
+                    if (checkoutHtml.indexOf('name="sms_consent"') === -1 ||
+                        registrationHtml.indexOf('name="sms_consent"') === -1 ||
+                        accountHtml.indexOf('name="sms_consent"') === -1) {
+                        alert('Error: The "sms_consent" checkbox must be present in all HTML snippets.');
+                        e.preventDefault(); // Stop form submission
+                    }
+                });
+            });
+        </script>
+        <?php
+    }    
 }
