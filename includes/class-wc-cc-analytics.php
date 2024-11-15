@@ -153,8 +153,6 @@ class WC_CC_Analytics extends \WC_Integration {
 		add_action( 'woocommerce_register_form', array( $this, 'add_sms_consent_to_registration_form' ) );
 		add_action( 'woocommerce_created_customer', array( $this, 'save_sms_consent_from_registration_form' ), 10, 1 );
 		add_action( 'woocommerce_created_customer', array( $this, 'update_consent_from_previous_orders' ), 20, 3 );
-		add_filter( 'woocommerce_rest_prepare_shop_order_object', array( $this, 'add_consent_to_order_api_response' ), 10, 3 );
-		add_filter( 'woocommerce_rest_prepare_customer', array( $this, 'add_consent_to_customer_api_response' ), 10, 3 );
 		add_action( 'admin_menu', array( $this, 'add_convert_cart_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_codemirror_assets' ) );
 	}
@@ -758,29 +756,7 @@ class WC_CC_Analytics extends \WC_Integration {
 				}
 			}
 		}
-	}
-
-	// Add the consent checkbox field to the REST API order response
-	function add_consent_to_order_api_response( $response, $order, $request ) {
-		// Get the consent value from order meta
-		$consent_given = get_post_meta( $order->get_id(), 'consent_checkbox', true );
-
-		// Add it to the order response under "meta_data"
-		$response->data['meta_data']['consent_checkbox'] = $consent_given ? true : false;
-
-		return $response;
-	}
-
-	// Add consent field to the customer API response
-	function add_consent_to_customer_api_response( $response, $user, $request ) {
-		// Get the consent value from user meta
-		$consent_given = get_user_meta( $user->ID, 'consent_checkbox', true );
-
-		// Add consent to the customer response
-		$response->data['consent_checkbox'] = $consent_given ? true : false;
-
-		return $response;
-	}
+    }
 
 	function add_convert_cart_menu() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
