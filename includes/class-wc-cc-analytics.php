@@ -650,8 +650,6 @@ class WC_CC_Analytics extends \WC_Integration {
 				$user_id = get_current_user_id();
 				if ( isset( $_POST['sms_consent'] ) ) {
 					update_user_meta( $user_id, 'sms_consent', 'yes' );
-				} else {
-					update_user_meta( $user_id, 'sms_consent', 'no' );
 				}
 			} else {
 				// Guest users: Save consent to order meta
@@ -695,11 +693,9 @@ class WC_CC_Analytics extends \WC_Integration {
 
 	function save_sms_consent_from_account_page( $user_id ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
-		if ( isset( $options['enable_sms_consent'] ) && $options['enable_sms_consent'] === 'yes' ) {
+		if ( isset( $options['enable_sms_consent'] ) && ( $options['enable_sms_consent'] === 'live' ) ) {
 			if ( isset( $_POST['sms_consent'] ) ) {
 				update_user_meta( $user_id, 'sms_consent', 'yes' );
-			} else {
-				update_user_meta( $user_id, 'sms_consent', 'no' );
 			}
 		}
 	}
