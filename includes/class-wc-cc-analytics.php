@@ -862,17 +862,34 @@ class WC_CC_Analytics extends \WC_Integration {
 
 					// JavaScript validation to check for sms_consent checkbox
 					$('#convert-cart-form').on('submit', function (e) {
-						var checkoutHtml = $('#cc_sms_consent_checkout_html').val();
-						var registrationHtml = $('#cc_sms_consent_registration_html').val();
-						var accountHtml = $('#cc_sms_consent_account_html').val();
+                        var checkoutHtml = $('#cc_sms_consent_checkout_html').val();
+                        var registrationHtml = $('#cc_sms_consent_registration_html').val();
+                        var accountHtml = $('#cc_sms_consent_account_html').val();
 
-						if (checkoutHtml.indexOf('name="sms_consent"') === -1 ||
-							registrationHtml.indexOf('name="sms_consent"') === -1 ||
-							accountHtml.indexOf('name="sms_consent"') === -1) {
-							alert('Error: The "sms_consent" checkbox must be present in all HTML snippets.');
-							e.preventDefault(); // Stop form submission
-						}
-					});
+                        // Function to validate HTML structure
+                        function isValidHTML(html) {
+                            var doc = document.createElement('div');
+                            doc.innerHTML = html.trim();
+                            return doc.innerHTML === html.trim(); // Check if it was parsed correctly
+                        }
+
+                        try {
+                            if (!isValidHTML(checkoutHtml) || 
+                                !isValidHTML(registrationHtml) || 
+                                !isValidHTML(accountHtml)) {
+                                throw new Error('Invalid HTML detected. Please fix the HTML syntax.');
+                            }
+
+                            if (checkoutHtml.indexOf('name="sms_consent"') === -1 || 
+                                registrationHtml.indexOf('name="sms_consent"') === -1 || 
+                                accountHtml.indexOf('name="sms_consent"') === -1) {
+                                throw new Error('The "sms_consent" checkbox must be present in all HTML snippets.');
+                            }
+                        } catch (error) {
+                            alert(error.message);
+                            e.preventDefault(); // Stop form submission
+                        }
+                    });
 				});
 			</script>
 			<?php
