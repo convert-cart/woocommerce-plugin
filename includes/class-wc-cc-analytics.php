@@ -867,22 +867,29 @@ class WC_CC_Analytics extends \WC_Integration {
                         var accountHtml = $('#cc_sms_consent_account_html').val();
 
                         // Function to validate HTML structure
-                        function isValidHTML(html) {
-                            var doc = document.createElement('div');
-                            doc.innerHTML = html.trim();
-                            return doc.innerHTML === html.trim(); // Check if it was parsed correctly
+                        function isValidHTML(...htmlArgs) {
+                            return htmlArgs.every(html => {
+                                let doc = document.createElement('div');
+                                doc.innerHTML = html.trim();
+                                return doc.innerHTML === html.trim(); // Check if it was parsed correctly
+                            });
+                        }
+
+                        function hasSmsConsentInputBoxWithId(...htmlArgs) {
+                            return htmlArgs.every(html => {
+                                let doc = document.createElement('div');
+                                doc.innerHTML = html.trim();
+                                const inputTag = doc.querySelector('input[name="sms_consent"]');
+                                return inputTag && inputTag.id === 'sms_consent' && inputTag.type === 'checkbox';
+                            });
                         }
 
                         try {
-                            if (!isValidHTML(checkoutHtml) || 
-                                !isValidHTML(registrationHtml) || 
-                                !isValidHTML(accountHtml)) {
+                            if (!isValidHTML(checkoutHtml, registrationHtml, accountHtml)) {
                                 throw new Error('Invalid HTML detected. Please fix the HTML syntax.');
                             }
 
-                            if (checkoutHtml.indexOf('name="sms_consent"') === -1 || 
-                                registrationHtml.indexOf('name="sms_consent"') === -1 || 
-                                accountHtml.indexOf('name="sms_consent"') === -1) {
+                            if (!hasSmsConsentInputBoxWithId(checkoutHtml, registrationHtml, accountHtml)) {
                                 throw new Error('The "sms_consent" checkbox must be present in all HTML snippets.');
                             }
                         } catch (error) {
