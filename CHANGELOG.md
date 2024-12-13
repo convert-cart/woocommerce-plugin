@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2024-12-13
+### Added
+- Consent tracking added. User should be able to update their consent from Checkout/My Account & Registration forms.
+- Consent styling can be changed from the Admin.
+
 ## [1.2.4] - 2024-08-28
 ### Tweaks
 - Added a 'Debug' setting to control the inclusion of version meta data in tracking scripts.
