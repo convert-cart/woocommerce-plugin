@@ -1,3 +1,0 @@
-- For adding SMS Conset, there's a possibility that user may wanted to edit it before going live. So we need to add an option for editing the code before going live.
-- Also we may have seperate option to enable it on each page like Account/Registration/Checkout pages.
-- How to get this SMS Consent to CC Servers? Through REST or Webhook
