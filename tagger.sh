@@ -155,6 +155,10 @@ fi
 printf "${YELLOW}Updating composer.json with version %s...${NC}\n" "$BETA_VERSION"
 sed -i "s/\"version\": \"$MAIN_VERSION\"/\"version\": \"$BETA_VERSION\"/" composer.json || handle_error "Failed to update composer.json for beta"
 
+# Update CDN URL for beta tag
+printf "${YELLOW}Updating CDN URL for beta tag...${NC}\n"
+sed -i "s/cdn\.convertcart\.com/cdn-beta.convertcart.com/g" cc-analytics.php || handle_error "Failed to update CDN URL for beta tag"
+
 # Update stable tag, version, and CC_PLUGIN_VERSION in cc-analytics.php for beta version
 printf "${YELLOW}Updating stable tag, version, and CC_PLUGIN_VERSION in cc-analytics.php for beta...${NC}\n"
 sed -i "s/^ \* Version: .*/ \* Version: $BETA_VERSION/" cc-analytics.php || handle_error "Failed to update version for beta"
