@@ -145,7 +145,7 @@ fi
 
 # Commit changes for production tag if chosen
 if [ "$choice" = "1" ] || [ "$choice" = "3" ]; then
-    git add composer.json README.md cc-analytics.php CHANGELOG.md || handle_error "Failed to add files for production commit"
+    git add composer.json README.md includes/class-wc-cc-analytics.php CHANGELOG.md || handle_error "Failed to add files for beta commit"
     git commit -m "Release version $MAIN_VERSION" || handle_error "Failed to commit production changes"
     git tag -a "$MAIN_VERSION" -m "Version $MAIN_VERSION" || handle_error "Failed to create production tag"
     printf "${GREEN}Production tag %s created successfully${NC}\n" "$MAIN_VERSION"
@@ -172,7 +172,7 @@ sed -i "s/badge\/v[0-9.]*\"/badge\/v$BETA_VERSION\"/" README.md || handle_error 
 
 # Commit changes for beta tag if chosen
 if [ "$choice" = "2" ] || [ "$choice" = "3" ]; then
-    git add composer.json README.md cc-analytics.php CHANGELOG.md || handle_error "Failed to add files for beta commit"
+    git add composer.json README.md includes/class-wc-cc-analytics.php CHANGELOG.md || handle_error "Failed to add files for beta commit"
     git commit -m "Release beta version $BETA_VERSION" || handle_error "Failed to commit beta version"
     git tag -a "$BETA_VERSION" -m "Beta version $BETA_VERSION" || handle_error "Failed to create beta tag"
     printf "${GREEN}Beta tag %s created successfully${NC}\n" "$BETA_VERSION"
