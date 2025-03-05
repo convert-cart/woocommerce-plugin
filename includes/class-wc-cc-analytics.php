@@ -932,7 +932,7 @@ class WC_CC_Analytics extends \WC_Integration {
 				__( 'Convert Cart', 'woocommerce_cc_analytics' ),
 				'manage_options',
 				'convert-cart-settings',
-				array( $this, 'render_convert_cart_email_settings_page' ),
+				array( $this, 'render_convert_cart_settings_page' ),
 				'dashicons-edit',
 				60
 			);
@@ -1107,14 +1107,17 @@ class WC_CC_Analytics extends \WC_Integration {
 						<h2><?php _e( 'Checkout Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
 						<textarea id="cc_email_consent_checkout_html" name="cc_email_consent_checkout_html" rows="10"
 							cols="50"><?php echo esc_textarea( $checkout_html ); ?></textarea>
+
+						<h2><?php _e( 'Registration Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
+						<textarea id="cc_email_consent_registration_html" name="cc_email_consent_registration_html" rows="10"
+							cols="50"><?php echo esc_textarea( $registration_html ); ?></textarea>
+						
+						<h2><?php _e( 'My Account Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
+						<textarea id="cc_email_consent_account_html" name="cc_email_consent_account_html" rows="10"
+							cols="50"><?php echo esc_textarea( $account_html ); ?></textarea>
+							
+						<p><input type="submit" name="save_convert_cart_email_html" value="Save Email Consent HTML Snippets" class="button-primary"></p>
 					</form>
-					<h2><?php _e( 'Registration Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
-					<textarea id="cc_email_consent_registration_html" name="cc_email_consent_registration_html" rows="10"
-						cols="50"><?php echo esc_textarea( $registration_html ); ?></textarea>
-					<h2><?php _e( 'My Account Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
-					<textarea id="cc_email_consent_account_html" name="cc_email_consent_account_html" rows="10"
-						cols="50"><?php echo esc_textarea( $account_html ); ?></textarea>
-					<p><input type="submit" name="save_convert_cart_email_html" value="Save Email Consent HTML Snippets" class="button-primary"></p>
 				</div>
 				<script>
 					jQuery(document).ready(function ($) {
@@ -1143,6 +1146,8 @@ class WC_CC_Analytics extends \WC_Integration {
 							var checkoutHtml = $('#cc_email_consent_checkout_html').val();
 							var registrationHtml = $('#cc_email_consent_registration_html').val();
 							var accountHtml = $('#cc_email_consent_account_html').val();
+
+							console.log(checkoutHtml, registrationHtml, accountHtml);
 
 							// Function to validate HTML structure
 							function isValidHTML(...htmlArgs) {
