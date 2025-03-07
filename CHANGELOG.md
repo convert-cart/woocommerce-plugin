@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2025-03-07
+### Added
+- Added endpoint for plugin info for debugging.
+
 ## [1.3.0] - 2024-12-13
 ### Added
 - Consent tracking added. User should be able to update their consent from Checkout/My Account & Registration forms.
