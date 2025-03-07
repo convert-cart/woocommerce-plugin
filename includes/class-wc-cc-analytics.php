@@ -887,8 +887,8 @@ class WC_CC_Analytics extends \WC_Integration {
 		global $woocommerce;
 		$info               = array();
 		$info['wp_version'] = $wp_version;
-		$info['wc_version'] = is_object( $woocommerce ) ? $woocommerce->version : null;
-		$info['cc_version'] = defined( 'CC_PLUGIN_VERSION' ) ? CC_PLUGIN_VERSION : null;  // Add plugin version
+		$info['wc_plugin_version'] = is_object( $woocommerce ) ? $woocommerce->version : null;
+		$info['cc_plugin_version'] = defined( 'CC_PLUGIN_VERSION' ) ? CC_PLUGIN_VERSION : null;  // Add plugin version
 		$webhooks           = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT webhook_id, `name`, delivery_url, status FROM {$wpdb->prefix}wc_webhooks WHERE `name` LIKE %s AND delivery_url LIKE %s",
