@@ -550,8 +550,8 @@ class WC_CC_Analytics extends \WC_Integration {
 		$event             = $data[1];
 		$sql               = "SELECT webhook_id, `name`, delivery_url FROM {$wpdb->prefix}wc_webhooks WHERE topic='{$original_resource}.{$event}' AND `name` LIKE 'convertcart%' AND delivery_url LIKE '%data-warehouse%'";
 		$cache_key         = 'cc_plugin_info_' . md5( $sql );
-		
-		$results = function_exists('wp_cache_get') ? wp_cache_get($cache_key) : false;
+
+		$results = function_exists( 'wp_cache_get' ) ? wp_cache_get( $cache_key ) : false;
 
 		if ( false === $results ) {
 			$results = $wpdb->get_results(
@@ -560,7 +560,7 @@ class WC_CC_Analytics extends \WC_Integration {
 					'cc_%'
 				)
 			);
-			if (function_exists('wp_cache_set')) {
+			if ( function_exists( 'wp_cache_set' ) ) {
 				wp_cache_set( $cache_key, $results );
 			}
 		}
@@ -714,7 +714,7 @@ class WC_CC_Analytics extends \WC_Integration {
 	 * @param int $customer_id The customer ID.
 	 * @return void
 	 */
-	public function save_sms_consent_when_account_is_created($customer_id) {
+	public function save_sms_consent_when_account_is_created( $customer_id ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_sms_consent'] ) && $options['enable_sms_consent'] === 'live' ) {
 			if ( isset( $_POST['sms_consent'] ) ) {
@@ -760,9 +760,9 @@ class WC_CC_Analytics extends \WC_Integration {
 		if ( isset( $options['enable_sms_consent'] ) && ( $options['enable_sms_consent'] === 'live' || $options['enable_sms_consent'] === 'draft' ) ) {
 			if ( isset( $_POST['save_convert_cart_html'] ) ) {
 				// PHP Validation to ensure the sms_consent checkbox is present
-				$cc_sms_consent_checkout_html = stripslashes( $_POST['cc_sms_consent_checkout_html'] );
-                $cc_sms_consent_registration_html = stripslashes( $_POST['cc_sms_consent_registration_html'] );
-                $cc_sms_consent_account_html = stripslashes( $_POST['cc_sms_consent_account_html'] );
+				$cc_sms_consent_checkout_html     = stripslashes( $_POST['cc_sms_consent_checkout_html'] );
+				$cc_sms_consent_registration_html = stripslashes( $_POST['cc_sms_consent_registration_html'] );
+				$cc_sms_consent_account_html      = stripslashes( $_POST['cc_sms_consent_account_html'] );
 				if (
 					strpos( $cc_sms_consent_checkout_html, 'name="sms_consent"' ) === false ||
 					strpos( $cc_sms_consent_registration_html, 'name="sms_consent"' ) === false ||
@@ -776,8 +776,8 @@ class WC_CC_Analytics extends \WC_Integration {
 					update_option( 'cc_sms_consent_account_html', $cc_sms_consent_account_html );
 
 					echo '<div class="updated"><p>HTML Snippets saved successfully!</p></div>';
-		}
-	}
+				}
+			}
 
 			// Default HTML snippets as fallback
 			$default_checkout_html = '<div class="sms-consent-checkbox"><label for="sms_consent"><input type="checkbox" name="sms_consent" id="sms_consent"> I consent to receive SMS communications.</label></div>';
@@ -835,41 +835,41 @@ class WC_CC_Analytics extends \WC_Integration {
 
 					// JavaScript validation to check for sms_consent checkbox
 					$('#convert-cart-form').on('submit', function (e) {
-                        var checkoutHtml = $('#cc_sms_consent_checkout_html').val();
-                        var registrationHtml = $('#cc_sms_consent_registration_html').val();
-                        var accountHtml = $('#cc_sms_consent_account_html').val();
+						var checkoutHtml = $('#cc_sms_consent_checkout_html').val();
+						var registrationHtml = $('#cc_sms_consent_registration_html').val();
+						var accountHtml = $('#cc_sms_consent_account_html').val();
 
-                        // Function to validate HTML structure
-                        function isValidHTML(...htmlArgs) {
-                            return htmlArgs.every(html => {
-                                let doc = document.createElement('div');
-                                doc.innerHTML = html.trim();
-                                return doc.innerHTML === html.trim(); // Check if it was parsed correctly
-                            });
-                        }
+						// Function to validate HTML structure
+						function isValidHTML(...htmlArgs) {
+							return htmlArgs.every(html => {
+								let doc = document.createElement('div');
+								doc.innerHTML = html.trim();
+								return doc.innerHTML === html.trim(); // Check if it was parsed correctly
+							});
+						}
 
-                        function hasSmsConsentInputBoxWithId(...htmlArgs) {
-                            return htmlArgs.every(html => {
-                                let doc = document.createElement('div');
-                                doc.innerHTML = html.trim();
-                                const inputTag = doc.querySelector('input[name="sms_consent"]');
-                                return inputTag && inputTag.id === 'sms_consent' && inputTag.type === 'checkbox';
-                            });
+						function hasSmsConsentInputBoxWithId(...htmlArgs) {
+							return htmlArgs.every(html => {
+								let doc = document.createElement('div');
+								doc.innerHTML = html.trim();
+								const inputTag = doc.querySelector('input[name="sms_consent"]');
+								return inputTag && inputTag.id === 'sms_consent' && inputTag.type === 'checkbox';
+							});
 	}
 
-                        try {
-                            if (!isValidHTML(checkoutHtml, registrationHtml, accountHtml)) {
-                                throw new Error('Invalid HTML detected. Please fix the HTML syntax.');
-                            }
+						try {
+							if (!isValidHTML(checkoutHtml, registrationHtml, accountHtml)) {
+								throw new Error('Invalid HTML detected. Please fix the HTML syntax.');
+							}
 
-                            if (!hasSmsConsentInputBoxWithId(checkoutHtml, registrationHtml, accountHtml)) {
-                                throw new Error('The "sms_consent" checkbox must be present in all HTML snippets.');
-                            }
-                        } catch (error) {
-                            alert(error.message);
-                            e.preventDefault(); // Stop form submission
+							if (!hasSmsConsentInputBoxWithId(checkoutHtml, registrationHtml, accountHtml)) {
+								throw new Error('The "sms_consent" checkbox must be present in all HTML snippets.');
+							}
+						} catch (error) {
+							alert(error.message);
+							e.preventDefault(); // Stop form submission
 			}
-                    });
+					});
 				});
 			</script>
 			<?php
@@ -885,19 +885,19 @@ class WC_CC_Analytics extends \WC_Integration {
 		global $wpdb;
 		global $wp_version;
 		global $woocommerce;
-		$info = array();
+		$info               = array();
 		$info['wp_version'] = $wp_version;
 		$info['wc_version'] = is_object( $woocommerce ) ? $woocommerce->version : null;
 		$info['cc_version'] = defined( 'CC_PLUGIN_VERSION' ) ? CC_PLUGIN_VERSION : null;  // Add plugin version
-		$webhooks = $wpdb->get_results(
+		$webhooks           = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT webhook_id, `name`, delivery_url, status FROM {$wpdb->prefix}wc_webhooks WHERE `name` LIKE %s AND delivery_url LIKE %s",
 				'convertcart%',
 				'%data-warehouse%'
 			)
 		);
-		
-		$info["webhooks"] = $webhooks;
+
+		$info['webhooks'] = $webhooks;
 		return $info;
 	}
 
@@ -929,7 +929,7 @@ class WC_CC_Analytics extends \WC_Integration {
 		wp_enqueue_script( 'wp-theme-plugin-editor' );
 		wp_enqueue_style( 'wp-codemirror' );
 	}
-	
+
 	function save_sms_consent_from_account_page( $user_id ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_sms_consent'] ) && ( $options['enable_sms_consent'] === 'live' ) ) {
