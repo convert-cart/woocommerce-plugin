@@ -697,13 +697,19 @@ class WC_CC_Analytics extends \WC_Integration {
 				$sms_consent   = get_user_meta( $user_id, 'sms_consent', true );
 				$checkout_html = str_replace( 'id="sms_consent"', 'id="sms_consent" ' . checked( $sms_consent, 'yes', false ), $checkout_html );
 			}
-			echo esc_html( $checkout_html );
+			echo $checkout_html;
 		}
 	}
 
-	function add_email_consent_checkbox() {
+    /**
+     * Saves SMS consent to order or customer.
+     *
+     * @param int $order_id The order ID.
+     * @return void
+     */
+	public function add_email_consent_checkbox() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
-		if ( isset( $options['enable_email_consent'] ) && ( $options['enable_email_consent'] === 'live' ) ) {
+		if ( isset( $options['enable_email_consent'] ) && ( 'live' === $options['enable_email_consent'] ) ) {
 			$checkout_html = get_option(
 				'cc_email_consent_checkout_html',
 				'<div class="email-consent-checkbox">
@@ -729,7 +735,7 @@ class WC_CC_Analytics extends \WC_Integration {
 	 * @param int $order_id The order ID.
 	 * @return void
 	 */
-	function save_sms_consent_to_order_or_customer( $order, $data ) {
+	public function save_sms_consent_to_order_or_customer( $order, $data ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_sms_consent'] ) && $options['enable_sms_consent'] === 'live' ) {
 			if ( is_user_logged_in() ) {
@@ -749,10 +755,15 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-	
-	function save_email_consent_to_order_or_customer( $order, $data ) {
+	/**
+     * Saves email consent to order or customer.
+     *
+     * @param int $order_id The order ID.
+     * @return void
+     */
+	public function save_email_consent_to_order_or_customer( $order, $data ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
-		if ( isset( $options['enable_email_consent'] ) && $options['enable_email_consent'] === 'live' ) {
+		if ( isset( $options['enable_email_consent'] ) && 'live' === $options['enable_email_consent'] ) {
 			if ( is_user_logged_in() ) {
 				// Logged-in users: Save consent to user meta
 				$user_id = get_current_user_id();
@@ -769,10 +780,16 @@ class WC_CC_Analytics extends \WC_Integration {
 			}
 		}
 	}
-	
-	function add_email_consent_checkbox_to_account_page() {
+
+	/**
+     * Saves SMS consent when account is created.
+     *
+     * @param int $customer_id The customer ID.
+     * @return void
+     */
+	public function add_email_consent_checkbox_to_account_page() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
-		if ( isset( $options['enable_email_consent'] ) && ( $options['enable_email_consent'] === 'live' ) ) {
+		if ( isset( $options['enable_email_consent'] ) && ( 'live' === $options['enable_email_consent'] ) ) {
 			$user_id     = get_current_user_id();
 			$email_consent = get_user_meta( $user_id, 'email_consent', true );
 
@@ -789,6 +806,7 @@ class WC_CC_Analytics extends \WC_Integration {
 			echo $account_html;
 		}
 	}
+
 	/**
 	 * Saves SMS consent when account is created.
 	 *
@@ -806,9 +824,15 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-	function save_email_consent_when_account_is_created( $customer_id, $new_customer_data, $password_generated ) {
+    /**
+     * Saves email consent when account is created.
+     *
+     * @param int $customer_id The customer ID.
+     * @return void
+     */
+	public function save_email_consent_when_account_is_created( $customer_id, $new_customer_data, $password_generated ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
-		if ( isset( $options['enable_email_consent'] ) && $options['enable_email_consent'] === 'live' ) {
+		if ( isset( $options['enable_email_consent'] ) && 'live' === $options['enable_email_consent'] ) {
 			if ( isset( $_POST['email_consent'] ) ) {
 				update_user_meta( $customer_id, 'email_consent', 'yes' );
 			} else {
@@ -822,7 +846,7 @@ class WC_CC_Analytics extends \WC_Integration {
 	 *
 	 * @return void
 	 */
-	function add_sms_consent_checkbox_to_account_page() {
+	public function add_sms_consent_checkbox_to_account_page() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_sms_consent'] ) && ( $options['enable_sms_consent'] === 'live' ) ) {
 			$user_id     = get_current_user_id();
@@ -842,7 +866,13 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-	function save_sms_consent_from_account_page( $user_id ) {
+    /**
+     * Saves SMS consent from account page.
+     *
+     * @param int $user_id The user ID.
+     * @return void
+     */
+	public function save_sms_consent_from_account_page( $user_id ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_sms_consent'] ) && ( $options['enable_sms_consent'] === 'live' ) ) {
 			if ( isset( $_POST['sms_consent'] ) ) {
@@ -851,16 +881,27 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-	function save_email_consent_from_account_page( $user_id ) {
+    /**
+     * Saves email consent from account page.
+     *
+     * @param int $user_id The user ID.
+     * @return void
+     */
+	public function save_email_consent_from_account_page( $user_id ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
-		if ( isset( $options['enable_email_consent'] ) && ( $options['enable_email_consent'] === 'live' ) ) {
+		if ( isset( $options['enable_email_consent'] ) && ( 'live' === $options['enable_email_consent'] ) ) {
 			if ( isset( $_POST['email_consent'] ) ) {
 				update_user_meta( $user_id, 'email_consent', 'yes' );
 			}
 		}
 	}
 
-	function add_sms_consent_to_registration_form() {
+    /**
+     * Adds SMS consent checkbox to registration form.
+     *
+     * @return void
+     */
+	public function add_sms_consent_to_registration_form() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_sms_consent'] ) && ( $options['enable_sms_consent'] === 'live' ) ) {
 			// Default HTML as a string
@@ -877,9 +918,15 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-	function add_email_consent_to_registration_form() {
+    /**
+     * Saves SMS consent from registration form.
+     *
+     * @param int $customer_id The customer ID.
+     * @return void
+     */
+	public function add_email_consent_to_registration_form() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
-		if ( isset( $options['enable_email_consent'] ) && ( $options['enable_email_consent'] === 'live' ) ) {
+		if ( isset( $options['enable_email_consent'] ) && ( 'live' === $options['enable_email_consent'] ) ) {
 			// Default HTML as a string
 			$default_html = '<p class="form-row form-row-wide"><label for="email_consent">' . esc_html__( 'I consent to receive email communications', 'woocommerce' ) . '</label><input type="checkbox" name="email_consent" id="email_consent"></p>';
 
@@ -890,9 +937,15 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-	function save_email_consent_from_registration_form( $customer_id ) {
+    /**
+     * Saves email consent from registration form.
+     *
+     * @param int $customer_id The customer ID.
+     * @return void
+     */
+	public function save_email_consent_from_registration_form( $customer_id ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
-		if ( isset( $options['enable_email_consent'] ) && $options['enable_email_consent'] === 'live' ) {
+		if ( isset( $options['enable_email_consent'] ) && 'live' === $options['enable_email_consent'] ) {
 			if ( isset( $_POST['email_consent'] ) ) {
 				update_user_meta( $customer_id, 'email_consent', 'yes' );
 			} else {
@@ -901,7 +954,13 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-	function save_sms_consent_from_registration_form( $customer_id ) {
+    /**
+     * Saves SMS consent from registration form.
+     *
+     * @param int $customer_id The customer ID.
+     * @return void
+     */
+	public function save_sms_consent_from_registration_form( $customer_id ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_sms_consent'] ) && $options['enable_sms_consent'] === 'live' ) {
 			if ( isset( $_POST['sms_consent'] ) ) {
@@ -912,7 +971,13 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-	function update_consent_from_previous_orders( $customer_id, $new_customer_data, $password_generated ) {
+    /**
+     * Updates SMS consent from previous orders.
+     *
+     * @param int $customer_id The customer ID.
+     * @return void
+     */
+	public function update_consent_from_previous_orders( $customer_id, $new_customer_data, $password_generated ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_sms_consent'] ) && $options['enable_sms_consent'] === 'live' ) {
 			$user_email = $new_customer_data['user_email'];
@@ -938,9 +1003,15 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
     }
 
-	function update_consent_from_previous_orders_email( $customer_id, $new_customer_data, $password_generated ) {
+    /**
+     * Updates email consent from previous orders.
+     *
+     * @param int $customer_id The customer ID.
+     * @return void
+     */
+	public function update_consent_from_previous_orders_email( $customer_id, $new_customer_data, $password_generated ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
-		if ( isset( $options['enable_email_consent'] ) && $options['enable_email_consent'] === 'live' ) {
+		if ( isset( $options['enable_email_consent'] ) && 'live' === $options['enable_email_consent'] ) {
 			$user_email = $new_customer_data['user_email'];
 
 			// Search for guest orders placed with the same email
@@ -964,7 +1035,12 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-	function add_convert_cart_menu() {
+    /**
+     * Adds Convert Cart menu to the admin dashboard.
+     *
+     * @return void
+     */
+	public function add_convert_cart_menu() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 
 		// Only show the menu if SMS consent is enabled
@@ -994,7 +1070,12 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-	function enqueue_codemirror_assets() {
+    /**
+     * Enqueues CodeMirror assets for the Convert Cart settings page.
+     *
+     * @return void
+     */
+	public function enqueue_codemirror_assets() {
 		wp_enqueue_code_editor( array( 'type' => 'text/html' ) );
 		wp_enqueue_script( 'wp-theme-plugin-editor' );
 		wp_enqueue_style( 'wp-codemirror' );
@@ -1005,7 +1086,7 @@ class WC_CC_Analytics extends \WC_Integration {
 	 *
 	 * @return void
 	 */
-	function render_convert_cart_settings_page() {
+	public function render_convert_cart_settings_page() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_sms_consent'] ) && ( $options['enable_sms_consent'] === 'live' || $options['enable_sms_consent'] === 'draft' ) ) {
 			if ( isset( $_POST['save_convert_cart_html'] ) ) {
@@ -1270,5 +1351,5 @@ class WC_CC_Analytics extends \WC_Integration {
 
 		$info['webhooks'] = $webhooks;
 		return $info;
-	}
+    }
 }
