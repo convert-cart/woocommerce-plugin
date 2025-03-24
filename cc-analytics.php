@@ -9,6 +9,8 @@
  * Stable Tag: 1.2.4
  * License: GPLv2 or later
  * Tags: conversion rate optimization, conversion, revenue boost
+ * WC requires at least: 3.0.0
+ * WC tested up to: 8.5.2
  *
  * @package WC_CC_Analytics
  */
@@ -17,6 +19,11 @@ namespace ConvertCart\Analytics;
 
 defined( 'ABSPATH' ) || exit;
 
+// Define plugin constants
+if ( ! defined( 'CC_PLUGIN_VERSION' ) ) {
+	define( 'CC_PLUGIN_VERSION', '1.2.4' );
+}
+
 /**
  * Add the integration to WooCommerce
  *
@@ -24,22 +31,20 @@ defined( 'ABSPATH' ) || exit;
  * @return array Updated array of integrations.
  */
 function add_integration( $integrations ) {
-	if ( ! defined( 'CC_PLUGIN_VERSION' ) ) {
-		define( 'CC_PLUGIN_VERSION', '1.2.4' );
+	// Check if WooCommerce is active
+	if ( ! class_exists( 'WooCommerce' ) ) {
+		return $integrations;
 	}
 
-	global $woocommerce;
-	if ( is_object( $woocommerce ) ) {
-		$integration_path = plugin_dir_path( __FILE__ ) . 'includes/class-wc-cc-analytics.php';
+	$integration_path = plugin_dir_path( __FILE__ ) . 'includes/class-wc-cc-analytics.php';
 
-		if ( file_exists( $integration_path ) ) {
-			include_once $integration_path;
-			$integrations[] = 'ConvertCart\Analytics\WC_CC_Analytics';
-		} elseif ( defined( 'WP_DEBUG' ) && WP_DEBUG === true ) {
-            // phpcs:disable WordPress.PHP.DevelopmentFunctions
-			error_log( 'WC_CC_Analytics integration file not found: ' . $integration_path );
-            // phpcs:enable
-		}
+	if ( file_exists( $integration_path ) ) {
+		include_once $integration_path;
+		$integrations[] = 'ConvertCart\Analytics\WC_CC_Analytics';
+	} elseif ( defined( 'WP_DEBUG' ) && WP_DEBUG === true ) {
+		// phpcs:disable WordPress.PHP.DevelopmentFunctions
+		error_log( 'WC_CC_Analytics integration file not found: ' . $integration_path );
+		// phpcs:enable
 	}
 
 	return $integrations;

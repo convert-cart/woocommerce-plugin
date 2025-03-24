@@ -300,14 +300,14 @@ class WC_CC_Analytics extends \WC_Integration {
 
 				foreach ( $line_items as $item ) {
 					$order_item = array();
-					$product    = $order->get_product_from_item( $item );
+					$product = wc_get_product( $item->get_product_id() );
 					if ( ! is_object( $product ) ) {
 						continue;
 					}
 					$order_item['name']     = $product->get_title();
 					$order_item['price']    = $product->get_price();
 					$order_item['currency'] = get_woocommerce_currency();
-					$order_item['quantity'] = isset( $item['qty'] ) ? $item['qty'] : null;
+					$order_item['quantity'] = $item->get_quantity();
 					$order_item['url']      = get_permalink( $product->get_id() );
 					if ( $product->get_image_id() ) {
 						$thumb_id = $product->get_image_id();
@@ -1186,7 +1186,7 @@ class WC_CC_Analytics extends \WC_Integration {
 								const inputTag = doc.querySelector('input[name="sms_consent"]');
 								return inputTag && inputTag.id === 'sms_consent' && inputTag.type === 'checkbox';
 							});
-	}
+						}
 
 						try {
 							if (!isValidHTML(checkoutHtml, registrationHtml, accountHtml)) {
@@ -1199,7 +1199,7 @@ class WC_CC_Analytics extends \WC_Integration {
 						} catch (error) {
 							alert(error.message);
 							e.preventDefault(); // Stop form submission
-			}
+						}
 					});
 				});
 			</script>
