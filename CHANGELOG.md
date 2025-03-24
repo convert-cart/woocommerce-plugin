@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.3] - 2025-03-24
+### Fixed
+- Removed deprecated WooCommerce functions and replaced with latest functions.
+
 ## [1.3.2] - 2025-03-07
 ### Added
 - Added email consent feature for account page, registeration page, checkout page.
