@@ -136,7 +136,7 @@ sed -i "s/badge\/v[0-9.]*\"/badge\/v$MAIN_VERSION\"/" README.md || handle_error 
 printf "${YELLOW}Updating version, stable tag, and CC_PLUGIN_VERSION in cc-analytics.php...${NC}\n"
 sed -i "s/^ \* Version: .*/ \* Version: $MAIN_VERSION/" cc-analytics.php || handle_error "Failed to update version in cc-analytics.php"
 sed -i "s/^[[:space:]]*\* Stable Tag: .*/ \* Stable Tag: $MAIN_VERSION/" cc-analytics.php || handle_error "Failed to update stable tag in cc-analytics.php"
-sed -i "s/define('CC_PLUGIN_VERSION', '.*');/define('CC_PLUGIN_VERSION', '$MAIN_VERSION');/" cc-analytics.php || handle_error "Failed to update CC_PLUGIN_VERSION in cc-analytics.php"
+sed -i "s/define( 'CC_PLUGIN_VERSION', '.*' );/define( 'CC_PLUGIN_VERSION', '$MAIN_VERSION' );/" cc-analytics.php || handle_error "Failed to update CC_PLUGIN_VERSION in cc-analytics.php"
 
 # Validate that the CHANGELOG.md is updated
 if ! grep -q "$MAIN_VERSION" CHANGELOG.md; then
