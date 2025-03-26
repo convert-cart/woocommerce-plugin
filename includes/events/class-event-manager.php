@@ -40,13 +40,15 @@ class Event_Manager {
 	}
 
 	/**
-	 * Function to track orderCompleted event
+	 * Track order completed event.
 	 *
 	 * @param int $data Order ID.
+	 * @return array|void Event info or void.
 	 */
 	public function ordered( $data ) {
 		try {
 			if ( is_wc_endpoint_url( 'order-received' ) ) {
+				$event_info = array();
 				$event_info['ccEvent'] = $this->get_event_type( 'orderCompleted' );
 				$order                 = wc_get_order( $data );
 				if ( ! is_object( $order ) ) {
@@ -56,7 +58,7 @@ class Event_Manager {
 				$event_info['total']    = $order->get_total();
 				$event_info['currency'] = get_woocommerce_currency();
 				$event_info['status']   = $order->get_status();
-				$promos                 = $order->get_used_coupons();
+				$promos                 = $order->get_coupon_codes();
 
 				if ( is_array( $promos ) ) {
 					$event_info['coupon_code'] = isset( $promos[0] ) ? $promos[0] : null;
@@ -76,18 +78,16 @@ class Event_Manager {
 					$order_item['currency'] = get_woocommerce_currency();
 					$order_item['quantity'] = $item->get_quantity();
 					$order_item['url']      = get_permalink( $product->get_id() );
-					if ( $product->get_image_id() ) {
-						$thumb_id = $product->get_image_id();
-					} else {
-						$thumb_id = get_post_thumbnail_id( $product->get_id() );
-					}
 
-					$thumb_url           = wp_get_attachment_image_src( $thumb_id );
-					$order_item['image'] = isset( $thumb_url[0] ) ? $thumb_url[0] : null;
+					// Get image ID
+					$thumb_id = $product->get_image_id() ? $product->get_image_id() : get_post_thumbnail_id( $product->get_id() );
+
+					// Get product image URL
+					$order_item['image'] = $thumb_id ? wp_get_attachment_image_url( $thumb_id, 'full' ) : null;
 					$order_items[]       = $order_item;
 				}
 				$event_info['items'] = $order_items;
-				$script              = $this->display_event_script( $event_info );
+				$this->display_event_script( $event_info );
 			}
 		} catch ( \Exception $e ) {
 			// Use WC_Logger instead of error_log for better debugging in production.
@@ -157,13 +157,12 @@ class Event_Manager {
 			$event_info['productName']  = $product->get_title();
 			$event_info['productPrice'] = $product->get_price();
 			$event_info['productUrl']   = get_permalink( $product->get_id() );
-			if ( $product->get_image_id() ) {
-				$thumb_id = $product->get_image_id();
-			} else {
-				$thumb_id = get_post_thumbnail_id( $product->get_id() );
-			}
-			$thumb_url                = wp_get_attachment_image_src( $thumb_id );
-			$event_info['productImg'] = isset( $thumb_url[0] ) ? $thumb_url[0] : null;
+			
+			// Get image ID
+			$thumb_id = $product->get_image_id() ? $product->get_image_id() : get_post_thumbnail_id( $product->get_id() );
+			
+			// Get product image URL
+			$event_info['productImg'] = $thumb_id ? wp_get_attachment_image_url( $thumb_id, 'full' ) : null;
 		}
 		return $event_info;
 	}
@@ -177,7 +176,8 @@ class Event_Manager {
 		$event_info            = array();
 		$event_info['ccEvent'] = $this->get_event_type( 'contentViewed' );
 		$event_info['title']   = wp_get_document_title();
-		$event_info['url']     = home_url( isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '' );
+		$event_info['url']     = home_url( add_query_arg( array() ) );
+
 		return $event_info;
 	}
 
@@ -200,55 +200,44 @@ class Event_Manager {
 
 			$item = array(
 				'name'     => $product->get_title(),
-				'price'    => $this->calculate_final_price( $cart_item ),
+				'price'    => $product->get_price(),
 				'currency' => get_woocommerce_currency(),
 				'quantity' => $cart_item['quantity'],
 				'url'      => get_permalink( $product->get_id() ),
 			);
 
-			if ( $product->get_image_id() ) {
-				$thumb_id = $product->get_image_id();
-			} else {
-				$thumb_id = get_post_thumbnail_id( $product->get_id() );
-			}
+			// Get image ID
+			$thumb_id = $product->get_image_id() ? $product->get_image_id() : get_post_thumbnail_id( $product->get_id() );
 
-			$thumb_url     = wp_get_attachment_image_src( $thumb_id );
-			$item['image'] = isset( $thumb_url[0] ) ? $thumb_url[0] : null;
-			$cart_items[]  = $item;
+			// Get product image URL
+			$item['image'] = $thumb_id ? wp_get_attachment_image_url( $thumb_id, 'full' ) : null;
+
+			$cart_items[] = $item;
 		}
-		return $cart_items;
-	}
 
-	/**
-	 * Calculate final price.
-	 *
-	 * @param array $cart_item Cart item.
-	 * @return float Final price.
-	 */
-	public function calculate_final_price( $cart_item ) {
-		$product = $cart_item['data'];
-		$price   = $product->get_price();
-		return $price;
+		return $cart_items;
 	}
 
 	/**
 	 * Display event script.
 	 *
 	 * @param array $event_info Event information.
+	 * @return void
 	 */
 	public function display_event_script( $event_info ) {
-		$event_info['metaData'] = $this->integration->getMetaInfo();
-		$event_json             = wp_json_encode( $event_info );
-		if ( isset( $event_json ) && '' !== $event_json ) {
-			?>
-			<!-- ConvertCart -->
-			<script type='text/javascript'>
-				window.ccLayer = window.ccLayer || [];
-				ccLayer.push(<?php echo wp_kses_post( $event_json ); ?>);
-			</script>
-			<!-- ConvertCart -->
-			<?php
+		if ( empty( $event_info ) ) {
+			return;
 		}
+
+		$event_json = wp_json_encode( $event_info );
+		?>
+		<!-- ConvertCart -->
+		<script>
+			window.ccLayer = window.ccLayer || [];
+			ccLayer.push(<?php echo wp_kses_post( $event_json ); ?>);
+		</script>
+		<!-- ConvertCart -->
+		<?php
 	}
 
 	/**
