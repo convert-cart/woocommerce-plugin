@@ -289,7 +289,7 @@ class WC_CC_Analytics extends \WC_Integration {
 				$event_info['total']    = $order->get_total();
 				$event_info['currency'] = get_woocommerce_currency();
 				$event_info['status']   = $order->get_status();
-				$promos                 = $order->get_used_coupons();
+				$promos                 = $order->get_coupon_codes();
 
 				if ( is_array( $promos ) ) {
 					$event_info['coupon_code'] = isset( $promos[0] ) ? $promos[0] : null;
@@ -1213,7 +1213,7 @@ class WC_CC_Analytics extends \WC_Integration {
 					$cc_email_consent_checkout_html = stripslashes( $_POST['cc_email_consent_checkout_html'] );
 					$cc_email_consent_registration_html = stripslashes( $_POST['cc_email_consent_registration_html'] );
 					$cc_email_consent_account_html = stripslashes( $_POST['cc_email_consent_account_html'] );
-					
+
 					if (
 						strpos( $cc_email_consent_checkout_html, 'name="email_consent"' ) === false ||
 						strpos( $cc_email_consent_registration_html, 'name="email_consent"' ) === false ||
@@ -1235,7 +1235,7 @@ class WC_CC_Analytics extends \WC_Integration {
 				$default_registration_html = '<p class="form-row form-row-wide"><label for="email_consent">' . esc_html__( 'I consent to receive email communications', 'woocommerce' ) . '</label><input type="checkbox" name="email_consent" id="email_consent"></p>';
 
 				$default_account_html = '<p class="form-row form-row-wide"><label for="email_consent">' . esc_html__( 'I consent to receive email communications', 'woocommerce' ) . '</label><input type="checkbox" name="email_consent" id="email_consent"></p>';
-				
+
 				// Get the saved HTML snippets or use defaults
 				$checkout_html     = get_option( 'cc_email_consent_checkout_html', $default_checkout_html );
 				$registration_html = get_option( 'cc_email_consent_registration_html', $default_registration_html );
@@ -1252,11 +1252,11 @@ class WC_CC_Analytics extends \WC_Integration {
 						<h2><?php _e( 'Registration Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
 						<textarea id="cc_email_consent_registration_html" name="cc_email_consent_registration_html" rows="10"
 							cols="50"><?php echo esc_textarea( $registration_html ); ?></textarea>
-						
+
 						<h2><?php _e( 'My Account Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
 						<textarea id="cc_email_consent_account_html" name="cc_email_consent_account_html" rows="10"
 							cols="50"><?php echo esc_textarea( $account_html ); ?></textarea>
-							
+
 						<p><input type="submit" name="save_convert_cart_email_html" value="Save Email Consent HTML Snippets" class="button-primary"></p>
 					</form>
 				</div>
