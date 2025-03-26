@@ -35,7 +35,7 @@ class Event_Manager {
 	 * Setup hooks.
 	 */
 	private function setup_hooks() {
-		add_action( 'wp_footer', array( $this, 'addEvents' ) );
+		add_action( 'wp_footer', array( $this, 'add_events' ) );
 		add_action( 'woocommerce_thankyou', array( $this, 'ordered' ) );
 	}
 
@@ -47,7 +47,7 @@ class Event_Manager {
 	public function ordered( $data ) {
 		try {
 			if ( is_wc_endpoint_url( 'order-received' ) ) {
-				$event_info['ccEvent'] = $this->getEventType( 'orderCompleted' );
+				$event_info['ccEvent'] = $this->get_event_type( 'orderCompleted' );
 				$order                 = wc_get_order( $data );
 				if ( ! is_object( $order ) ) {
 					return $event_info;
@@ -67,7 +67,7 @@ class Event_Manager {
 
 				foreach ( $line_items as $item ) {
 					$order_item = array();
-					$product = wc_get_product( $item->get_product_id() );
+					$product    = wc_get_product( $item->get_product_id() );
 					if ( ! is_object( $product ) ) {
 						continue;
 					}
@@ -87,166 +87,156 @@ class Event_Manager {
 					$order_items[]       = $order_item;
 				}
 				$event_info['items'] = $order_items;
-				$script              = $this->displayEventScript( $event_info );
+				$script              = $this->display_event_script( $event_info );
 			}
 		} catch ( \Exception $e ) {
-			error_log( 'ConvertCart Error: ' . $e->getMessage() );
+			// Use WC_Logger instead of error_log for better debugging in production.
+			wc_get_logger()->error( 'ConvertCart Error: ' . $e->getMessage(), array( 'source' => 'convertcart-analytics' ) );
 		}
 	}
 
 	/**
-	 * Function to track various events
+	 * Add events to the page.
 	 */
-	public function addEvents() {
+	public function add_events() {
 		try {
-			if ( is_front_page() && ! is_shop() ) {
-				$event_info['ccEvent'] = $this->getEventType( 'homepageViewed' );
-			} elseif ( is_shop() ) {
-				$event_info['ccEvent'] = $this->getEventType( 'shopPageViewed' );
-			} elseif ( is_product_category() ) {
-				$event_info = $this->getCategoryViewedProps();
+			global $wp_query;
+			$event_info = array();
+
+			if ( is_product_category() ) {
+				$event_info = $this->get_category_viewed_props();
 			} elseif ( is_product() ) {
-				$event_info = $this->getProductViewedProps();
-			} elseif ( is_search() ) {
-				$event_info['ccEvent'] = $this->getEventType( 'productsSearched' );
-				$event_info['query']   = get_search_query();
-			} elseif ( is_cart() || ( is_checkout() && ! is_wc_endpoint_url( 'order-received' ) ) ) {
-				if ( is_cart() ) {
-					$event_info['ccEvent'] = $this->getEventType( 'cartViewed' );
-				} elseif ( is_checkout() && ! is_wc_endpoint_url( 'order-received' ) ) {
-					$event_info['ccEvent'] = $this->getEventType( 'checkoutViewed' );
-				}
-				$cart                   = WC()->cart;
-				$event_info['total']    = $cart->total;
-				$event_info['currency'] = get_woocommerce_currency();
-				$event_info['items']    = $this->getCartItems( $cart->get_cart() );
-			} elseif ( is_single() || is_page() ) {
-				$event_info = $this->getContentPageProps();
+				$event_info = $this->get_product_viewed_props();
+			} elseif ( is_cart() ) {
+				$event_info['ccEvent'] = $this->get_event_type( 'cartViewed' );
+				$event_info['items']   = $this->get_cart_items();
+			} elseif ( is_checkout() ) {
+				$event_info['ccEvent'] = $this->get_event_type( 'checkoutStarted' );
+				$event_info['items']   = $this->get_cart_items();
+			} elseif ( is_front_page() || is_home() || is_page() ) {
+				$event_info = $this->get_content_page_props();
 			}
 
-			if ( isset( $event_info ) ) {
-				$script = $this->displayEventScript( $event_info );
+			if ( ! empty( $event_info ) ) {
+				$this->display_event_script( $event_info );
 			}
 		} catch ( \Exception $e ) {
-			error_log( 'ConvertCart Error: ' . $e->getMessage() );
+			// Use WC_Logger instead of error_log for better debugging in production.
+			wc_get_logger()->error( 'ConvertCart Error: ' . $e->getMessage(), array( 'source' => 'convertcart-analytics' ) );
 		}
 	}
 
 	/**
-	 * Function to get properties of categoryViewed event
-	 */
-	public function getCategoryViewedProps() {
-		$event_info            = array();
-		$event_info['ccEvent'] = $this->getEventType( 'categoryViewed' );
-		global $wp_query;
-		// get the query object.
-		if ( ! is_object( $wp_query ) ) {
-			return $event_info;
-		}
-		$cat_obj = $wp_query->get_queried_object();
-		if ( is_object( $cat_obj ) ) {
-			$event_info['name']  = $cat_obj->name;
-			$event_info['url']   = get_category_link( $cat_obj->term_id );
-			$event_info['id']    = $cat_obj->term_id;
-			$event_info['count'] = $cat_obj->count;
-		}
-		return $event_info;
-	}
-
-	/**
-	 * Function to get properties of productViewed event
-	 */
-	public function getProductViewedProps() {
-		$event_info            = array();
-		$event_info['ccEvent'] = $this->getEventType( 'productViewed' );
-		global $product;
-		if ( ! is_object( $product ) ) {
-			return $event_info;
-		}
-
-		$event_info['id']            = $product->get_id();
-		$event_info['name']          = $product->get_title();
-		$event_info['is_in_stock']   = $product->is_in_stock();
-		$event_info['url']           = $product->get_permalink();
-		$event_info['price']         = $product->get_price();
-		$event_info['regular_price'] = $product->get_regular_price();
-		$event_info['currency']      = get_woocommerce_currency();
-		$event_info['type']          = $product->get_type();
-		$thumb_id                    = get_post_thumbnail_id();
-		if ( isset( $thumb_id ) ) {
-			$thumb_url           = wp_get_attachment_image_src( $thumb_id, 'full' );
-			$event_info['image'] = isset( $thumb_url[0] ) ? $thumb_url[0] : null;
-		}
-		return $event_info;
-	}
-
-	/**
-	 * Function to get properties of contentPageViewed event
-	 */
-	public function getContentPageProps() {
-		$event_info            = array();
-		$event_info['ccEvent'] = $this->getEventType( 'contentPageViewed' );
-		$event_info['type']    = 'Page';
-		$event_info['title']   = get_the_title();
-		$event_info['url']     = get_permalink();
-		return $event_info;
-	}
-
-	/**
-	 * Function to get cart items
+	 * Get category viewed properties.
 	 *
-	 * @param array $items Cart items.
+	 * @return array Category viewed properties.
 	 */
-	public function getCartItems( $items ) {
+	public function get_category_viewed_props() {
+		$event_info            = array();
+		$event_info['ccEvent'] = $this->get_event_type( 'categoryViewed' );
+		$category              = get_queried_object();
+		if ( is_object( $category ) ) {
+			$event_info['categoryId']   = $category->term_id;
+			$event_info['categoryName'] = $category->name;
+			$event_info['categoryUrl']  = get_term_link( $category->term_id, 'product_cat' );
+		}
+		return $event_info;
+	}
+
+	/**
+	 * Get product viewed properties.
+	 *
+	 * @return array Product viewed properties.
+	 */
+	public function get_product_viewed_props() {
+		global $product;
+		$event_info            = array();
+		$event_info['ccEvent'] = $this->get_event_type( 'productViewed' );
+		if ( is_object( $product ) ) {
+			$event_info['productId']    = $product->get_id();
+			$event_info['productName']  = $product->get_title();
+			$event_info['productPrice'] = $product->get_price();
+			$event_info['productUrl']   = get_permalink( $product->get_id() );
+			if ( $product->get_image_id() ) {
+				$thumb_id = $product->get_image_id();
+			} else {
+				$thumb_id = get_post_thumbnail_id( $product->get_id() );
+			}
+			$thumb_url                = wp_get_attachment_image_src( $thumb_id );
+			$event_info['productImg'] = isset( $thumb_url[0] ) ? $thumb_url[0] : null;
+		}
+		return $event_info;
+	}
+
+	/**
+	 * Get content page properties.
+	 *
+	 * @return array Content page properties.
+	 */
+	public function get_content_page_props() {
+		$event_info            = array();
+		$event_info['ccEvent'] = $this->get_event_type( 'contentViewed' );
+		$event_info['title']   = wp_get_document_title();
+		$event_info['url']     = home_url( isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '' );
+		return $event_info;
+	}
+
+	/**
+	 * Get cart items.
+	 *
+	 * @return array Cart items.
+	 */
+	public function get_cart_items() {
 		$cart_items = array();
-		if ( ! is_array( $items ) ) {
+		if ( ! WC()->cart ) {
 			return $cart_items;
 		}
-		foreach ( $items as $item => $values ) {
-			if ( ! isset( $values['data'] ) || ! is_object( $values['data'] ) ) {
+
+		foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+			$product = $cart_item['data'];
+			if ( ! is_object( $product ) ) {
 				continue;
 			}
-			$product_id            = $values['data']->get_id();
-			$cart_item['id']       = $product_id;
-			$cart_item['name']     = $values['data']->get_name();
-			$cart_item['quantity'] = $values['quantity'];
-			$cart_item['price']    = $values['data']->get_price();
-			$cart_item['currency'] = get_woocommerce_currency();
-			if ( isset( $product_id ) ) {
-				$cart_item['url'] = get_permalink( $product_id );
-				if ( $values['data']->get_image_id() ) {
-					$thumb_id = $values['data']->get_image_id();
-				} else {
-					$thumb_id = get_post_thumbnail_id( $product_id );
-				}
-				$thumb_url          = wp_get_attachment_image_src( $thumb_id, 'full' );
-				$cart_item['image'] = isset( $thumb_url[0] ) ? $thumb_url[0] : null;
+
+			$item = array(
+				'name'     => $product->get_title(),
+				'price'    => $this->calculate_final_price( $cart_item ),
+				'currency' => get_woocommerce_currency(),
+				'quantity' => $cart_item['quantity'],
+				'url'      => get_permalink( $product->get_id() ),
+			);
+
+			if ( $product->get_image_id() ) {
+				$thumb_id = $product->get_image_id();
+			} else {
+				$thumb_id = get_post_thumbnail_id( $product->get_id() );
 			}
-			$cart_items[] = $cart_item;
+
+			$thumb_url     = wp_get_attachment_image_src( $thumb_id );
+			$item['image'] = isset( $thumb_url[0] ) ? $thumb_url[0] : null;
+			$cart_items[]  = $item;
 		}
 		return $cart_items;
 	}
 
 	/**
-	 * Function to calculate final price of product
+	 * Calculate final price.
 	 *
-	 * @param type decimal|string $regular_price .
-	 * @param type decimal|string $sale_price .
+	 * @param array $cart_item Cart item.
+	 * @return float Final price.
 	 */
-	public function calculateFinalPrice( $regular_price, $sale_price ) {
-		if ( $sale_price < $regular_price ) {
-			return $sale_price;
-		} else {
-			return $regular_price;
-		}
+	public function calculate_final_price( $cart_item ) {
+		$product = $cart_item['data'];
+		$price   = $product->get_price();
+		return $price;
 	}
 
 	/**
-	 * Function to display cc tracking script
+	 * Display event script.
 	 *
-	 * @param string $event_info .
+	 * @param array $event_info Event information.
 	 */
-	public function displayEventScript( $event_info ) {
+	public function display_event_script( $event_info ) {
 		$event_info['metaData'] = $this->integration->getMetaInfo();
 		$event_json             = wp_json_encode( $event_info );
 		if ( isset( $event_json ) && '' !== $event_json ) {
@@ -254,7 +244,7 @@ class Event_Manager {
 			<!-- ConvertCart -->
 			<script type='text/javascript'>
 				window.ccLayer = window.ccLayer || [];
-				ccLayer.push(<?php echo $event_json; ?>);
+				ccLayer.push(<?php echo wp_kses_post( $event_json ); ?>);
 			</script>
 			<!-- ConvertCart -->
 			<?php
@@ -262,11 +252,12 @@ class Event_Manager {
 	}
 
 	/**
-	 * Function to get event type
+	 * Get event type.
 	 *
-	 * @param string $event_name .
+	 * @param string $event_name Event name.
+	 * @return string Event type.
 	 */
-	public function getEventType( $event_name ) {
+	public function get_event_type( $event_name ) {
 		return $event_name;
 	}
-} 
+}

@@ -9,17 +9,17 @@ defined( 'ABSPATH' ) || exit;
 ?>
 
 <div class="wrap">
-	<h1><?php _e( 'Convert Cart SMS Consent Settings', 'woocommerce_cc_analytics' ); ?></h1>
+	<h1><?php esc_html_e( 'Convert Cart SMS Consent Settings', 'woocommerce_cc_analytics' ); ?></h1>
 	<form method="POST" id="convert-cart-form">
-		<h2><?php _e( 'Checkout Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
+		<h2><?php esc_html_e( 'Checkout Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
 		<textarea id="cc_sms_consent_checkout_html" name="cc_sms_consent_checkout_html" rows="10"
 			cols="50"><?php echo esc_textarea( $checkout_html ); ?></textarea>
 
-		<h2><?php _e( 'Registration Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
+		<h2><?php esc_html_e( 'Registration Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
 		<textarea id="cc_sms_consent_registration_html" name="cc_sms_consent_registration_html" rows="10"
 			cols="50"><?php echo esc_textarea( $registration_html ); ?></textarea>
 
-		<h2><?php _e( 'My Account Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
+		<h2><?php esc_html_e( 'My Account Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
 		<textarea id="cc_sms_consent_account_html" name="cc_sms_consent_account_html" rows="10"
 			cols="50"><?php echo esc_textarea( $account_html ); ?></textarea>
 

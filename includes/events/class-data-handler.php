@@ -37,7 +37,7 @@ class Data_Handler {
 	 * @return array Processed event data.
 	 */
 	public function process_data( $data ) {
-		// Process event data
+		// Process event data.
 		return $data;
 	}
-} 
+}

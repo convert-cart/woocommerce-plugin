@@ -37,369 +37,248 @@ class Integration extends \WC_Integration {
 
 		// Define user set variables.
 		$this->cc_client_id = $this->get_option( 'cc_client_id' );
+
+		// Actions.
 		add_action( 'woocommerce_update_options_integration_' . $this->id, array( $this, 'process_admin_options' ) );
 
-		if ( ! isset( $this->cc_client_id ) || '' === $this->cc_client_id ) {
-			return;
-		}
-
-		// Load dependencies
+		// Initialize the plugin components.
 		$this->load_dependencies();
-		
-		// Setup hooks
-		$this->setup_hooks();
+		$this->init_components();
 	}
 
 	/**
-	 * Load dependencies.
+	 * Load required dependencies.
 	 */
 	private function load_dependencies() {
-		// Include required files
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'events/class-event-manager.php';
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'events/class-data-handler.php';
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'consent/class-sms-consent.php';
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'consent/class-email-consent.php';
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-admin.php';
+		// Include required files.
+		require_once plugin_dir_path( __DIR__ ) . 'events/class-event-manager.php';
+		require_once plugin_dir_path( __DIR__ ) . 'events/class-data-handler.php';
+		require_once plugin_dir_path( __DIR__ ) . 'consent/class-sms-consent.php';
+		require_once plugin_dir_path( __DIR__ ) . 'consent/class-email-consent.php';
+		require_once plugin_dir_path( __DIR__ ) . 'admin/class-admin.php';
 	}
 
 	/**
-	 * Setup hooks.
+	 * Initialize plugin components.
 	 */
-	private function setup_hooks() {
-		// Actions added below.
-		add_action( 'wp_head', array( $this, 'cc_init' ) );
-		
-		// REST API filters
-		add_filter(
-			'woocommerce_rest_product_object_query',
-			function ( array $args, \WP_REST_Request $request ) {
-				$modified_after = $request->get_param( 'modified_after' );
+	private function init_components() {
+		// Initialize event manager.
+		$event_manager = new \ConvertCart\Analytics\Events\Event_Manager( $this );
+		$data_handler  = new \ConvertCart\Analytics\Events\Data_Handler( $this );
 
-				if ( ! $modified_after ) {
-					return $args;
-				}
+		// Initialize consent managers.
+		$sms_consent   = new \ConvertCart\Analytics\Consent\SMS_Consent( $this );
+		$email_consent = new \ConvertCart\Analytics\Consent\Email_Consent( $this );
 
-				$args['date_query'][0]['column'] = 'post_modified';
-				$args['date_query'][0]['after']  = $modified_after;
-
-				return $args;
-			},
-			10,
-			2
-		);
-
-		add_filter(
-			'woocommerce_rest_orders_prepare_object_query',
-			function ( array $args, \WP_REST_Request $request ) {
-				$modified_after = $request->get_param( 'modified_after' );
-				if ( ! $modified_after ) {
-					return $args;
-				}
-
-				$args['date_query'][0]['column'] = 'post_modified';
-				$args['date_query'][0]['after']  = $modified_after;
-				return $args;
-			},
-			10,
-			2
-		);
-
-		add_filter( 'woocommerce_rest_customer_query', array( $this, 'addUpdatedSinceFilterToRESTApi' ), 10, 2 );
-		add_filter( 'rest_product_collection_params', array( $this, 'maximum_api_filter' ) );
-		
-		// REST API endpoints
-		add_action(
-			'rest_api_init',
-			function () {
-				register_rest_route(
-					'wc/v3',
-					'cc-version',
-					array(
-						'methods'             => 'GET',
-						'callback'            => array( $this, 'getVersionList' ),
-						'permission_callback' => array( $this, 'permissionCallback' ),
-					)
-				);
-			}
-		);
-		
-		add_action(
-			'rest_api_init',
-			function () {
-				register_rest_route(
-					'wc/v3', // Namespace
-					'cc-plugin-info', // Route
-					array(
-						'methods'             => 'GET', // HTTP method
-						'callback'            => array( $this, 'get_plugin_info' ), // Callback function
-						'permission_callback' => array( $this, 'permissionCallback' ), // Permission check
-					)
-				);
-			}
-		);
-		
-		// Category webhooks
-		add_action(
-			'create_product_cat',
-			function ( $term_id, $args ) {
-				do_action(
-					'woocommerce_admin_product_category_webhook_handler',
-					array(
-						'term'     => $term_id,
-						'topic'    => 'category.created',
-						'category' => $args,
-					)
-				);
-			},
-			10,
-			3
-		);
-		
-		add_action(
-			'edit_product_cat',
-			function ( $term_id, $args ) {
-				do_action(
-					'woocommerce_admin_product_category_webhook_handler',
-					array(
-						'term'     => $term_id,
-						'topic'    => 'category.updated',
-						'category' => $args,
-					)
-				);
-			},
-			10,
-			3
-		);
-		
-		add_action(
-			'delete_product_cat',
-			function ( $term_id, $tt_id = '' ) {
-				do_action(
-					'woocommerce_admin_product_category_webhook_handler',
-					array(
-						'term'  => $term_id,
-						'topic' => 'category.deleted',
-					)
-				);
-			},
-			10,
-			3
-		);
-		
-		add_action( 'woocommerce_admin_product_category_webhook_handler', array( $this, 'sendCategoryRelatedNotification' ), 10, 1 );
+		// Initialize admin.
+		$admin = new \ConvertCart\Analytics\Admin\Admin( $this );
 	}
 
 	/**
-	 * Initialize integration settings form fields.
-	 */
-	public function init_form_fields() {
-		$this->form_fields = array(
-			'cc_client_id'       => array(
-				'title'       => __( 'Client ID / Domain Id', 'woocommerce_cc_analytics' ),
-				'type'        => 'text',
-				'description' => __( 'Contact Convert Cart To Get Client ID / Domain Id', 'woocommerce_cc_analytics' ),
-				'desc_tip'    => true,
-				'default'     => '',
-			),
-			'debug_mode'         => array(
-				'title'       => __( 'Enable Debug Mode', 'woocommerce_cc_analytics' ),
-				'type'        => 'checkbox',
-				'label'       => __( 'Enable Debugging for Meta Info', 'woocommerce_cc_analytics' ),
-				'default'     => 'no',
-				'description' => __( 'If enabled, WooCommerce & WordPress plugin versions will be included in tracking metadata.', 'woocommerce_cc_analytics' ),
-			),
-			'enable_sms_consent' => array(
-				'title'       => __( 'Enable SMS Consent', 'woocommerce_cc_analytics' ),
-				'type'        => 'select',  // Use a dropdown instead of a checkbox
-				'options'     => array(
-					'disabled' => __( 'Disabled', 'woocommerce_cc_analytics' ),
-					'draft'    => __( 'Draft Mode (Editable, not displayed on frontend)', 'woocommerce_cc_analytics' ),
-					'live'     => __( 'Live Mode (Editable, displayed on frontend)', 'woocommerce_cc_analytics' ),
-				),
-				'description' => __( 'Select the mode for SMS Consent: Draft to edit without injecting code, Live to edit with code injection.', 'woocommerce_cc_analytics' ),
-				'default'     => 'disabled',
-			),
-			'enable_email_consent' => array(
-				'title'       => __( 'Enable Email Consent', 'woocommerce_cc_analytics' ),
-				'type'        => 'select',
-				'options'     => array(
-					'disabled' => __( 'Disabled', 'woocommerce_cc_analytics' ),
-					'draft'    => __( 'Draft Mode (Editable, not displayed on frontend)', 'woocommerce_cc_analytics' ),
-					'live'     => __( 'Live Mode (Editable, displayed on frontend)', 'woocommerce_cc_analytics' ),
-				),
-				'description' => __( 'Select the mode for Email Consent: Draft to edit without injecting code, Live to edit with code injection.', 'woocommerce_cc_analytics' ),
-				'default'     => 'disabled',
-			),
-		);
-	}
-
-	/**
-	 * Initialize the CC Analytics script.
-	 */
-	public function cc_init() {
-		if ( ! $this->cc_client_id ) {
-			return;
-		}
-
-		echo "<script data-cfasync='false'>
-			(function(c, o, n, v, e, r, t, s) {
-				s = c.fetch ? 'f' : '';
-				c.ccartObj = e;
-				c[e] = c[e] || function() {
-					(c[e].q = c[e].q || []).push(arguments)
-				};
-				c[e].t = Date.now();
-				r = o.createElement(n);
-				r.async = 1;
-				r.src = v + s + '.js';
-				t = o.getElementsByTagName(n)[0];
-				t.parentNode.insertBefore(r, t);
-			})(window, document, 'script', '//cdn.convertcart.com/" . $this->cc_client_id . "', 'ccart');
-		</script>";
-	}
-
-	/**
-	 * Function to add meta information to cc tracking script
+	 * Get metadata for tracking.
+	 *
+	 * @return array Metadata.
 	 */
 	public function getMetaInfo() {
 		global $wp_version;
 		global $woocommerce;
-		global $current_user;
 
-		$meta_data = array();
+		$meta = array(
+			'platform'         => 'wordpress',
+			'platform_version' => $wp_version,
+			'wc_version'       => $woocommerce->version,
+			'plugin_version'   => CC_PLUGIN_VERSION,
+		);
 
-		if ( is_object( $current_user ) ) {
-			if ( isset( $current_user->user_email ) ) {
-				$meta_data['customer_status'] = 'logged_in';
-				$meta_data['customer_email']  = $current_user->user_email;
-			} else {
-				$meta_data['customer_status'] = 'guest';
-			}
+		// Add debug info if enabled.
+		if ( 'yes' === $this->get_option( 'debug_mode' ) ) {
+			// Add additional debug information.
+			$meta['debug_mode']         = true;
+			$meta['php_version']        = PHP_VERSION;
+			$meta['memory_limit']       = ini_get( 'memory_limit' );
+			$meta['max_execution_time'] = ini_get( 'max_execution_time' );
+			$meta['timezone']           = wp_timezone_string();
 		}
 
-		$meta_data['date']     = gmdate( 'Y-m-d H:i:s' );
-		$meta_data['currency'] = get_woocommerce_currency();
-
-		$debug_mode = $this->get_option( 'debug_mode' );
-		if ( 'yes' === $debug_mode ) {
-			$meta_data['pv'] = is_object( $woocommerce ) ? $woocommerce->version : null;
-			$meta_data['wv'] = $wp_version;
-		}
-		$meta_data['pgv'] = defined( 'CC_PLUGIN_VERSION' ) ? CC_PLUGIN_VERSION : null;
-
-		return $meta_data;
+		return $meta;
 	}
 
 	/**
-	 * Sends notification for category-related events.
-	 *
-	 * @param array $args Event arguments
-	 * @return void
+	 * Initialize form fields.
 	 */
-	public function sendCategoryRelatedNotification( $args ) {
-		global $wpdb;
+	public function init_form_fields() {
+		$this->form_fields = array(
+			'cc_client_id'         => array(
+				'title'       => __( 'Client ID / Domain Id', 'woocommerce_cc_analytics' ),
+				'type'        => 'text',
+				'description' => __( 'Enter your Convert Cart client ID or domain ID.', 'woocommerce_cc_analytics' ),
+				'desc_tip'    => true,
+				'default'     => '',
+			),
+			'debug_mode'           => array(
+				'title'       => __( 'Enable Debug Mode', 'woocommerce_cc_analytics' ),
+				'type'        => 'checkbox',
+				'description' => __( 'If enabled, WooCommerce & WordPress plugin versions will be included in tracking metadata.', 'woocommerce_cc_analytics' ),
+			),
+			'enable_sms_consent'   => array(
+				'title'       => __( 'Enable SMS Consent', 'woocommerce_cc_analytics' ),
+				'type'        => 'select',  // Use a dropdown instead of a checkbox.
+				'description' => __( 'Enable SMS consent collection at checkout, registration, and account pages.', 'woocommerce_cc_analytics' ),
+				'default'     => 'disabled',
+				'options'     => array(
+					'disabled' => __( 'Disabled', 'woocommerce_cc_analytics' ),
+					'draft'    => __( 'Draft Mode (Admin Only)', 'woocommerce_cc_analytics' ),
+					'live'     => __( 'Live Mode', 'woocommerce_cc_analytics' ),
+				),
+			),
+			'enable_email_consent' => array(
+				'title'       => __( 'Enable Email Consent', 'woocommerce_cc_analytics' ),
+				'type'        => 'select',  // Use a dropdown instead of a checkbox.
+				'description' => __( 'Enable email consent collection at checkout, registration, and account pages.', 'woocommerce_cc_analytics' ),
+				'default'     => 'disabled',
+				'options'     => array(
+					'disabled' => __( 'Disabled', 'woocommerce_cc_analytics' ),
+					'draft'    => __( 'Draft Mode (Admin Only)', 'woocommerce_cc_analytics' ),
+					'live'     => __( 'Live Mode', 'woocommerce_cc_analytics' ),
+				),
+			),
+		);
+	}
 
-		$id         = isset( $args['term'] ) ? $args['term'] : 0;
-		$topic      = isset( $args['topic'] ) ? $args['topic'] : null;
-		$body       = $args;
-		$body['id'] = $id;
+	/**
+	 * Output the settings form.
+	 */
+	public function admin_options() {
+		?>
+		<h2><?php esc_html_e( 'Convert Cart Analytics Settings', 'woocommerce_cc_analytics' ); ?></h2>
+		<p><?php esc_html_e( 'Configure your Convert Cart Analytics integration settings below.', 'woocommerce_cc_analytics' ); ?></p>
+		<table class="form-table">
+			<?php echo wp_kses_post( $this->generate_settings_html( null, false ) ); ?>
+		</table>
+		<?php
+		echo wp_kses_post( '<p>' . __( 'After saving your Client ID, you can configure SMS and Email consent settings in their respective tabs.', 'woocommerce_cc_analytics' ) . '</p>' );
+	}
 
-		$data              = explode( '.', $topic );
-		$original_resource = 'product';
-		$modified_resource = $data[0];
-		$event             = $data[1];
-		$sql               = "SELECT webhook_id, `name`, delivery_url FROM {$wpdb->prefix}wc_webhooks WHERE topic='{$original_resource}.{$event}' AND `name` LIKE 'convertcart%' AND delivery_url LIKE '%data-warehouse%'";
-		$cache_key         = 'cc_plugin_info_' . md5( $sql );
+	/**
+	 * Get customer data by ID.
+	 *
+	 * @param int $customer_id Customer ID.
+	 * @return array Customer data.
+	 */
+	public function get_customer_data( $customer_id ) {
+		$customer_data = array();
+		$user          = get_userdata( $customer_id );
 
-		$results = function_exists( 'wp_cache_get' ) ? wp_cache_get( $cache_key ) : false;
+		if ( $user ) {
+			$customer_data['id']            = $customer_id;
+			$customer_data['email']         = $user->user_email;
+			$customer_data['first_name']    = $user->first_name;
+			$customer_data['last_name']     = $user->last_name;
+			$customer_data['phone']         = get_user_meta( $customer_id, 'billing_phone', true );
+			$customer_data['sms_consent']   = get_user_meta( $customer_id, 'sms_consent', true );
+			$customer_data['email_consent'] = get_user_meta( $customer_id, 'email_consent', true );
+		}
 
-		if ( false === $results ) {
-			$results = $wpdb->get_results(
-				$wpdb->prepare(
-					"SELECT option_name, option_value FROM $wpdb->options WHERE option_name LIKE %s",
-					'cc_%'
+		return $customer_data;
+	}
+
+	/**
+	 * Get customer data by email.
+	 *
+	 * @param string $email Customer email.
+	 * @return array Customer data.
+	 */
+	public function get_customer_data_by_email( $email ) {
+		$customer_data = array();
+		$user          = get_user_by( 'email', $email );
+
+		if ( $user ) {
+			$customer_data = $this->get_customer_data( $user->ID );
+		} else {
+			// Try to find customer from orders.
+			$orders = wc_get_orders(
+				array(
+					'billing_email' => $email,
+					'limit'         => 1,
 				)
 			);
-			if ( function_exists( 'wp_cache_set' ) ) {
-				wp_cache_set( $cache_key, $results );
+
+			if ( ! empty( $orders ) ) {
+				$order                          = reset( $orders );
+				$customer_data['email']         = $email;
+				$customer_data['phone']         = $order->get_billing_phone();
+				$customer_data['sms_consent']   = $order->get_meta( 'sms_consent' );
+				$customer_data['email_consent'] = $order->get_meta( 'email_consent' );
 			}
 		}
 
-		foreach ( $results as $result ) {
-			$model_delivery_url = $result['delivery_url'];
-			$target_url         = preg_replace( "/{$original_resource}/", "{$modified_resource}", $model_delivery_url );
+		return $customer_data;
+	}
 
-			$opts = array(
-				'body'        => wp_json_encode( $body ),
-				'timeout'     => '120',
-				'redirection' => '5',
-				'httpversion' => '1.0',
-				'blocking'    => true,
-				'headers'     => array( 'Content-Type' => 'application/json' ),
-				'cookies'     => array(),
-				'url'         => $target_url,
-			);
+	/**
+	 * Get customer consent status.
+	 *
+	 * @param int    $customer_id Customer ID.
+	 * @param string $consent_type Consent type (sms or email).
+	 * @return string Consent status.
+	 */
+	public function get_customer_consent( $customer_id, $consent_type ) {
+		return get_user_meta( $customer_id, $consent_type . '_consent', true );
+	}
 
-			$response = wp_remote_post( $target_url, $opts );
+	/**
+	 * Get customer consent status by email.
+	 *
+	 * @param string $email Customer email.
+	 * @param string $consent_type Consent type (sms or email).
+	 * @return string Consent status.
+	 */
+	public function get_customer_consent_by_email( $email, $consent_type ) {
+		$user = get_user_by( 'email', $email );
+		if ( $user ) {
+			return $this->get_customer_consent( $user->ID, $consent_type );
 		}
-	}
 
-	/**
-	 * Set maximum API filter
-	 *
-	 * @param array $query_params Query parameters
-	 * @return array Modified query parameters
-	 */
-	public function maximum_api_filter( $query_params ) {
-		$query_params['per_page']['maximum'] = 5000;
-		return $query_params;
-	}
-
-	/**
-	 * Function get version list
-	 *
-	 * @param WP_REST_Request $request Request object
-	 * @return array Version information
-	 */
-	public function getVersionList( $request ) {
-		global $wp_version;
-		global $woocommerce;
-		$info               = array();
-		$info['wp_version'] = $wp_version;
-		$info['wc_version'] = is_object( $woocommerce ) ? $woocommerce->version : null;
-		return $info;
-	}
-
-	/**
-	 * Add updated since filter to REST API
-	 *
-	 * @param array $prepared_args Prepared arguments
-	 * @param WP_REST_Request $request Request object
-	 * @return array Modified arguments
-	 */
-	public function addUpdatedSinceFilterToRESTApi( $prepared_args, $request ) {
-		if ( $request->get_param( 'modified_after' ) ) {
-			$prepared_args['meta_query'] = array(
-				array(
-					'key'     => 'last_update',
-					'value'   => (int) strtotime( $request->get_param( 'modified_after' ) ),
-					'compare' => '>=',
+		// Try to find consent from orders.
+		// Note: Using meta_query is necessary here for email lookup.
+		$orders = get_posts(
+			array(
+				'post_type'   => 'shop_order',
+				'post_status' => array_keys( wc_get_order_statuses() ),
+				'meta_query'  => array(
+					array(
+						'key'   => '_billing_email',
+						'value' => $email,
+					),
 				),
-			);
+				'numberposts' => 1,
+			)
+		);
+
+		if ( ! empty( $orders ) ) {
+			$order = wc_get_order( $orders[0]->ID );
+			return $order->get_meta( $consent_type . '_consent' );
 		}
-		return $prepared_args;
+
+		return '';
 	}
 
 	/**
-	 * Function authentication of our custom endpoints
+	 * Validate API key.
 	 *
-	 * @param WP_REST_Request $request Request object
-	 * @return bool Whether the request is authorized
+	 * @param array $queryparams Query parameters.
+	 * @return bool Whether the API key is valid.
 	 */
-	public function permissionCallback( $request ) {
+	public function validate_api_key( $queryparams ) {
 		global $wpdb;
-		$queryparams = $request->get_params();
-		$key         = $wpdb->get_row(
+
+		if ( ! isset( $queryparams['consumer_secret'] ) ) {
+			return false;
+		}
+
+		// Check if the API key exists in the database.
+		// Direct DB call is necessary for API key validation.
+		$key = $wpdb->get_row(
 			$wpdb->prepare(
 				"
 			SELECT consumer_secret
@@ -411,7 +290,7 @@ class Integration extends \WC_Integration {
 			ARRAY_A
 		);
 
-		if ( $key['consumer_secret'] ) {
+		if ( isset( $key['consumer_secret'] ) ) {
 			return true;
 		}
 		return false;
@@ -426,11 +305,15 @@ class Integration extends \WC_Integration {
 		global $wpdb;
 		global $wp_version;
 		global $woocommerce;
-		$info               = array();
-		$info['wp_version'] = $wp_version;
+
+		$info                      = array();
+		$info['wp_version']        = $wp_version;
 		$info['wc_plugin_version'] = is_object( $woocommerce ) ? $woocommerce->version : null;
-		$info['cc_plugin_version'] = defined( 'CC_PLUGIN_VERSION' ) ? CC_PLUGIN_VERSION : null;  // Add plugin version
-		$webhooks           = $wpdb->get_results(
+		$info['cc_plugin_version'] = defined( 'CC_PLUGIN_VERSION' ) ? CC_PLUGIN_VERSION : null;  // Add plugin version.
+
+		// Get webhooks that match our criteria.
+		// Direct DB call is necessary for webhook lookup with LIKE operators.
+		$webhooks = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT webhook_id, `name`, delivery_url, status FROM {$wpdb->prefix}wc_webhooks WHERE `name` LIKE %s AND delivery_url LIKE %s",
 				'convertcart%',
@@ -441,4 +324,4 @@ class Integration extends \WC_Integration {
 		$info['webhooks'] = $webhooks;
 		return $info;
 	}
-} 
+}
