@@ -1,6 +1,6 @@
 # Convert Cart WordPress Plugin
 
-![Version](https://img.shields.io/badge/version-1.2.4-blue.svg)
+![Version](https://img.shields.io/badge/version-1.3.3-blue.svg)
 ![License](https://img.shields.io/badge/license-Proprietary-red.svg)
 
 ## Table of Contents
@@ -37,7 +37,7 @@ If your domain is set up with the beta URL (`app-beta.convertcart.com`):
 1. **If the client is installing**:  
    - Hand over the downloaded plugin file and let them work their magic 🎩.
    
-2. **If you’ve got the admin credentials**:  
+2. **If you've got the admin credentials**:  
    - Install the plugin directly through the WordPress Plugin Manager, usually located at `https://www.example.com/wp-admin/plugins.php`.
    - Alternatively, you can also upload the unzipped plugin files to the `/wp-content/plugins/` directory using FTP.
    

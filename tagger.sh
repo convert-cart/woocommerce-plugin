@@ -17,7 +17,7 @@ set -e
 
 # Function to handle errors (POSIX compliant)
 handle_error() {
-    printf "${RED}Error occurred: %s${NC}\n" "$1"
+    printf "${RED}Error: %s${NC}\n" "$1"
     cleanup
     exit 1
 }
@@ -148,7 +148,17 @@ if [ "$choice" = "1" ] || [ "$choice" = "3" ]; then
     git add composer.json README.md includes/class-wc-cc-analytics.php cc-analytics.php CHANGELOG.md || handle_error "Failed to add files for beta commit"
     git commit -m "Release version $MAIN_VERSION" || handle_error "Failed to commit production changes"
     git tag -a "$MAIN_VERSION" -m "Version $MAIN_VERSION" || handle_error "Failed to create production tag"
-    printf "${GREEN}Production tag %s created successfully${NC}\n" "$MAIN_VERSION"
+    
+    # Push changes to master branch
+    printf "${YELLOW}Pushing changes to master branch...${NC}\n"
+    git push origin master || handle_error "Failed to push changes to master branch"
+    
+    # Push the production tag
+    printf "${YELLOW}Pushing production tag %s...${NC}\n" "$MAIN_VERSION"
+    git push origin "$MAIN_VERSION" || handle_error "Failed to push production tag"
+    
+    printf "${GREEN}Production tag %s created and pushed successfully${NC}\n" "$MAIN_VERSION"
+    printf "${GREEN}Changes pushed to master branch successfully${NC}\n"
 fi
 
 # Update to beta version in composer.json
@@ -175,18 +185,12 @@ if [ "$choice" = "2" ] || [ "$choice" = "3" ]; then
     git add composer.json README.md includes/class-wc-cc-analytics.php cc-analytics.php CHANGELOG.md || handle_error "Failed to add files for beta commit"
     git commit -m "Release beta version $BETA_VERSION" || handle_error "Failed to commit beta version"
     git tag -a "$BETA_VERSION" -m "Beta version $BETA_VERSION" || handle_error "Failed to create beta tag"
-    printf "${GREEN}Beta tag %s created successfully${NC}\n" "$BETA_VERSION"
-fi
-
-# Push tags to remote if created
-if [ "$choice" = "1" ] || [ "$choice" = "3" ]; then
-    printf "${YELLOW}Pushing production tag to remote...${NC}\n"
-    git push -f origin "$MAIN_VERSION" || handle_error "Failed to push production tag"
-fi
-
-if [ "$choice" = "2" ] || [ "$choice" = "3" ]; then
-    printf "${YELLOW}Pushing beta tag to remote...${NC}\n"
-    git push -f origin "$BETA_VERSION" || handle_error "Failed to push beta tag"
+    
+    # Push the beta tag
+    printf "${YELLOW}Pushing beta tag %s...${NC}\n" "$BETA_VERSION"
+    git push origin "$BETA_VERSION" || handle_error "Failed to push beta tag"
+    
+    printf "${GREEN}Beta tag %s created and pushed successfully${NC}\n" "$BETA_VERSION"
 fi
 
 # Final cleanup: Checkout master and clean up the temporary branch
