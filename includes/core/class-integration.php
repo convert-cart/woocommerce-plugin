@@ -50,7 +50,6 @@ class Integration extends \WC_Integration {
 	 * Load required dependencies.
 	 */
 	private function load_dependencies() {
-		// Include required files.
 		require_once plugin_dir_path( __DIR__ ) . 'events/class-event-manager.php';
 		require_once plugin_dir_path( __DIR__ ) . 'events/class-data-handler.php';
 		require_once plugin_dir_path( __DIR__ ) . 'consent/class-sms-consent.php';
@@ -62,16 +61,11 @@ class Integration extends \WC_Integration {
 	 * Initialize plugin components.
 	 */
 	private function init_components() {
-		// Initialize event manager.
 		$event_manager = new \ConvertCart\Analytics\Events\Event_Manager( $this );
 		$data_handler  = new \ConvertCart\Analytics\Events\Data_Handler( $this );
-
-		// Initialize consent managers.
 		$sms_consent   = new \ConvertCart\Analytics\Consent\SMS_Consent( $this );
 		$email_consent = new \ConvertCart\Analytics\Consent\Email_Consent( $this );
-
-		// Initialize admin.
-		$admin = new \ConvertCart\Analytics\Admin\Admin( $this );
+		$admin         = new \ConvertCart\Analytics\Admin\Admin( $this );
 	}
 
 	/**
@@ -90,9 +84,7 @@ class Integration extends \WC_Integration {
 			'plugin_version'   => CC_PLUGIN_VERSION,
 		);
 
-		// Add debug info if enabled.
 		if ( 'yes' === $this->get_option( 'debug_mode' ) ) {
-			// Add additional debug information.
 			$meta['debug_mode']         = true;
 			$meta['php_version']        = PHP_VERSION;
 			$meta['memory_limit']       = ini_get( 'memory_limit' );
@@ -122,7 +114,7 @@ class Integration extends \WC_Integration {
 			),
 			'enable_sms_consent'   => array(
 				'title'       => __( 'Enable SMS Consent', 'woocommerce_cc_analytics' ),
-				'type'        => 'select',  // Use a dropdown instead of a checkbox.
+				'type'        => 'select',
 				'description' => __( 'Enable SMS consent collection at checkout, registration, and account pages.', 'woocommerce_cc_analytics' ),
 				'default'     => 'disabled',
 				'options'     => array(
@@ -130,17 +122,19 @@ class Integration extends \WC_Integration {
 					'draft'    => __( 'Draft Mode (Admin Only)', 'woocommerce_cc_analytics' ),
 					'live'     => __( 'Live Mode', 'woocommerce_cc_analytics' ),
 				),
+				'desc_tip'    => true,
 			),
 			'enable_email_consent' => array(
 				'title'       => __( 'Enable Email Consent', 'woocommerce_cc_analytics' ),
-				'type'        => 'select',  // Use a dropdown instead of a checkbox.
-				'description' => __( 'Enable email consent collection at checkout, registration, and account pages.', 'woocommerce_cc_analytics' ),
+				'type'        => 'select',
+				'description' => __( 'Enable Email consent collection at checkout, registration, and account pages.', 'woocommerce_cc_analytics' ),
 				'default'     => 'disabled',
 				'options'     => array(
 					'disabled' => __( 'Disabled', 'woocommerce_cc_analytics' ),
 					'draft'    => __( 'Draft Mode (Admin Only)', 'woocommerce_cc_analytics' ),
 					'live'     => __( 'Live Mode', 'woocommerce_cc_analytics' ),
 				),
+				'desc_tip'    => true,
 			),
 		);
 	}
@@ -185,7 +179,7 @@ class Integration extends \WC_Integration {
 	/**
 	 * Get customer data by email.
 	 *
-	 * @param string $email Customer email.
+	 * @param string $email Email address.
 	 * @return array Customer data.
 	 */
 	public function get_customer_data_by_email( $email ) {
@@ -193,13 +187,16 @@ class Integration extends \WC_Integration {
 		$user          = get_user_by( 'email', $email );
 
 		if ( $user ) {
-			$customer_data = $this->get_customer_data( $user->ID );
+			$customer_data['email']         = $email;
+			$customer_data['phone']         = get_user_meta( $user->ID, 'billing_phone', true );
+			$customer_data['sms_consent']   = get_user_meta( $user->ID, 'sms_consent', true );
+			$customer_data['email_consent'] = get_user_meta( $user->ID, 'email_consent', true );
 		} else {
-			// Try to find customer from orders.
+			// Try to find guest order data.
 			$orders = wc_get_orders(
 				array(
 					'billing_email' => $email,
-					'limit'         => 1,
+					'limit'         => 1, // Get the most recent order for this email.
 				)
 			);
 
@@ -227,37 +224,38 @@ class Integration extends \WC_Integration {
 	}
 
 	/**
-	 * Get customer consent status by email.
+	 * Get consent status for a given email and consent type.
+	 * Checks user meta first, then falls back to the latest order meta.
 	 *
-	 * @param string $email Customer email.
-	 * @param string $consent_type Consent type (sms or email).
-	 * @return string Consent status.
+	 * @param string $email Email address.
+	 * @param string $consent_type Consent type ('sms' or 'email').
+	 * @return string Consent status ('yes', 'no', or '').
 	 */
-	public function get_customer_consent_by_email( $email, $consent_type ) {
+	public function get_consent_status( $email, $consent_type ) {
 		$user = get_user_by( 'email', $email );
 		if ( $user ) {
-			return $this->get_customer_consent( $user->ID, $consent_type );
+			$consent = get_user_meta( $user->ID, $consent_type . '_consent', true );
+			if ( ! empty( $consent ) ) {
+				return $consent;
+			}
 		}
 
-		// Try to find consent from orders.
-		// Note: Using meta_query is necessary here for email lookup.
-		$orders = get_posts(
+		// Fallback: Check the latest order for this email.
+		$orders = wc_get_orders(
 			array(
-				'post_type'   => 'shop_order',
-				'post_status' => array_keys( wc_get_order_statuses() ),
-				'meta_query'  => array(
-					array(
-						'key'   => '_billing_email',
-						'value' => $email,
-					),
-				),
-				'numberposts' => 1,
+				'limit'         => 1, // We only need the latest order's consent status ideally.
+				'status'        => array_keys( wc_get_order_statuses() ),
+				'customer'      => $email, // wc_get_orders uses 'customer' for email lookup.
+				'type'          => 'shop_order',
+				'orderby'       => 'date',
+				'order'         => 'DESC',
 			)
 		);
 
+
 		if ( ! empty( $orders ) ) {
-			$order = wc_get_order( $orders[0]->ID );
-			return $order->get_meta( $consent_type . '_consent' );
+			$order = $orders[0];
+			return $order->get_meta( $consent_type . '_consent', true ); // Get single value.
 		}
 
 		return '';
@@ -276,7 +274,6 @@ class Integration extends \WC_Integration {
 			return false;
 		}
 
-		// Check if the API key exists in the database.
 		// Direct DB call is necessary for API key validation.
 		$key = $wpdb->get_row(
 			$wpdb->prepare(
@@ -309,9 +306,8 @@ class Integration extends \WC_Integration {
 		$info                      = array();
 		$info['wp_version']        = $wp_version;
 		$info['wc_plugin_version'] = is_object( $woocommerce ) ? $woocommerce->version : null;
-		$info['cc_plugin_version'] = defined( 'CC_PLUGIN_VERSION' ) ? CC_PLUGIN_VERSION : null;  // Add plugin version.
+		$info['cc_plugin_version'] = defined( 'CC_PLUGIN_VERSION' ) ? CC_PLUGIN_VERSION : null;
 
-		// Get webhooks that match our criteria.
 		// Direct DB call is necessary for webhook lookup with LIKE operators.
 		$webhooks = $wpdb->get_results(
 			$wpdb->prepare(
