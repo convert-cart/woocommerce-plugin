@@ -57,6 +57,7 @@ class Integration extends \WC_Integration {
 	 * Load required dependencies.
 	 */
 	private function load_dependencies() {
+		require_once plugin_dir_path( __DIR__ ) . 'consent/class-base-consent.php';
 		require_once plugin_dir_path( __DIR__ ) . 'events/class-event-manager.php';
 		require_once plugin_dir_path( __DIR__ ) . 'events/class-data-handler.php';
 		require_once plugin_dir_path( __DIR__ ) . 'consent/class-sms-consent.php';
