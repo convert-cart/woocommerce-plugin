@@ -48,6 +48,7 @@ class Integration extends \WC_Integration {
 		// Actions.
 		add_action( 'woocommerce_update_options_integration_' . $this->id, array( $this, 'process_admin_options' ) );
 		add_action( 'admin_menu', array( $this, 'add_menu_items' ), 15 );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
 		add_filter( 'parent_file', array( $this, 'highlight_menu_item' ) );
 		add_filter( 'submenu_file', array( $this, 'highlight_submenu_item' ) );
 
@@ -361,7 +362,7 @@ class Integration extends \WC_Integration {
 		// SMS Consent submenu
 		add_submenu_page(
 			$parent_slug,
-			__( 'CC SMS Consent', 'woocommerce_cc_analytics' ),
+			__( 'SMS Consent', 'woocommerce_cc_analytics' ),
 			__( 'SMS Consent', 'woocommerce_cc_analytics' ),
 			'manage_woocommerce',
 			'convert-cart-sms-consent',
@@ -371,7 +372,7 @@ class Integration extends \WC_Integration {
 		// Email Consent submenu
 		add_submenu_page(
 			$parent_slug,
-			__( 'CC Email Consent', 'woocommerce_cc_analytics' ),
+			__( 'Email Consent', 'woocommerce_cc_analytics' ),
 			__( 'Email Consent', 'woocommerce_cc_analytics' ),
 			'manage_woocommerce',
 			'convert-cart-email-consent',
@@ -478,8 +479,8 @@ class Integration extends \WC_Integration {
 	private function get_default_sms_consent_html() {
 		return '<div class="sms-consent-checkbox">
 			<label for="sms_consent">
-				<input type="checkbox" name="sms_consent" id="sms_consent">
-				' . esc_html__( 'I consent to receive SMS communications.', 'woocommerce_cc_analytics' ) . '
+				<input type="checkbox" name="sms_consent" id="sms_consent" />
+				<span>' . esc_html__( 'I consent to receive SMS communications.', 'woocommerce_cc_analytics' ) . '</span>
 			</label>
 		</div>';
 	}
@@ -490,8 +491,8 @@ class Integration extends \WC_Integration {
 	private function get_default_email_consent_html() {
 		return '<div class="email-consent-checkbox">
 			<label for="email_consent">
-				<input type="checkbox" name="email_consent" id="email_consent">
-				' . esc_html__( 'I consent to receive email communications.', 'woocommerce_cc_analytics' ) . '
+				<input type="checkbox" name="email_consent" id="email_consent" />
+				<span>' . esc_html__( 'I consent to receive email communications.', 'woocommerce_cc_analytics' ) . '</span>
 			</label>
 		</div>';
 	}
@@ -511,7 +512,145 @@ class Integration extends \WC_Integration {
 			#adminmenu .toplevel_page_convert-cart .wp-menu-image:before {
 				content: none;
 			}
+			.code-editor-wrapper {
+				border: 1px solid #ddd;
+				margin-bottom: 20px;
+			}
+			.code-editor-wrapper .CodeMirror {
+				height: auto;
+				min-height: 150px;
+			}
 		</style>
 		<?php
+	}
+
+	/**
+	 * Enqueue admin scripts and styles
+	 */
+	public function enqueue_admin_scripts() {
+		$screen = get_current_screen();
+		
+		// Only load on our consent pages
+		if ( strpos( $screen->id, 'convert-cart-sms-consent' ) !== false || 
+			 strpos( $screen->id, 'convert-cart-email-consent' ) !== false ) {
+			
+			// Check if code editor is available and user hasn't disabled it
+			$settings = wp_enqueue_code_editor(array(
+				'type' => 'text/html',
+				'codemirror' => array(
+					'lineNumbers' => true,
+					'lineWrapping' => true,
+					'styleActiveLine' => true,
+					'matchBrackets' => true,
+					'autoCloseBrackets' => true,
+					'autoCloseTags' => true,
+					'mode' => 'htmlmixed',
+					'tabSize' => 4,
+					'indentUnit' => 4,
+					'indentWithTabs' => true,
+				),
+			));
+
+			// Bail if user disabled CodeMirror
+			if ( false === $settings ) {
+				return;
+			}
+			
+			wp_enqueue_script('jquery');
+			
+			// Load the beautifier library
+			wp_enqueue_script(
+				'js-beautify',
+				'https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-html.min.js',
+				array(),
+				'1.14.9',
+				true
+			);
+
+			wp_add_inline_script('code-editor', '
+				jQuery(function($) {
+					var editorSettings = ' . wp_json_encode( $settings ) . ';
+					var beautifyOptions = {
+						indent_size: 4,
+						indent_with_tabs: true,
+						wrap_line_length: 0,
+						preserve_newlines: false,
+						max_preserve_newlines: 2,
+						indent_inner_html: true,
+						wrap_attributes: "auto",
+						wrap_attributes_indent_size: 4,
+						end_with_newline: false,
+						indent_empty_lines: false,
+						unformatted: ["code", "pre"],
+						content_unformatted: ["pre"],
+						extra_liners: [],
+						indent_scripts: "normal"
+					};
+
+					editorSettings.codemirror.extraKeys = {
+						"Tab": function(cm) {
+							if (cm.somethingSelected()) {
+								cm.indentSelection("add");
+							} else {
+								cm.replaceSelection(cm.getOption("indentWithTabs")? "\t":
+									Array(cm.getOption("indentUnit") + 1).join(" "), "end", "+input");
+							}
+						},
+						"Shift-Tab": "indentLess"
+					};
+
+					$(".consent-html-editor").each(function(i, textarea) {
+						// Prevent default tab behavior
+						$(textarea).on("keydown", function(e) {
+							if (e.keyCode === 9) { // tab key
+								e.preventDefault();
+							}
+						});
+
+						var editor = wp.codeEditor.initialize(textarea, editorSettings);
+						
+						// Set tab handling message
+						var message = $("<p>", {
+							text: "Use Tab key for indentation. Shift+Tab to decrease indent.",
+							class: "description",
+							css: { "margin-top": "5px", "font-style": "italic" }
+						});
+						$(textarea).closest(".code-editor-wrapper").prepend(message);
+
+						// Format the initial content
+						var initialContent = editor.codemirror.getValue();
+						if (window.html_beautify && initialContent.trim()) {
+							var formattedContent = window.html_beautify(initialContent, beautifyOptions);
+							editor.codemirror.setValue(formattedContent);
+						}
+
+						editor.codemirror.on("change", function() {
+							textarea.value = editor.codemirror.getValue();
+						});
+
+						// Add format button
+						var formatButton = $("<button>", {
+							text: "Format HTML",
+							class: "button format-html-button",
+							css: { "margin-top": "5px" }
+						});
+
+						formatButton.on("click", function(e) {
+							e.preventDefault();
+							var content = editor.codemirror.getValue();
+							if (window.html_beautify && content.trim()) {
+								var formatted = window.html_beautify(content, beautifyOptions);
+								editor.codemirror.setValue(formatted);
+							}
+						});
+
+						$(textarea).closest(".code-editor-wrapper").append(formatButton);
+					});
+				});
+			' );
+
+			wp_enqueue_style('code-editor');
+			wp_enqueue_style('wp-codemirror');
+		}
 	}
 }
