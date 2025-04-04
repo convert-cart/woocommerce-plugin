@@ -24,6 +24,9 @@ handle_error() {
 
 # Cleanup function
 cleanup() {
+    # Store current branch
+    local current_branch=$(git rev-parse --abbrev-ref HEAD)
+
     git reset .
     git clean -fd .
     git checkout .
@@ -34,6 +37,10 @@ cleanup() {
 
     # Delete the temporary branch if it exists
     if git show-ref --verify --quiet refs/heads/$BACKUP_BRANCH; then
+        # Make sure we're not on the branch we're trying to delete
+        if [ "$current_branch" = "$BACKUP_BRANCH" ]; then
+            git checkout $BRANCH
+        fi
         git branch -D $BACKUP_BRANCH || printf "${RED}Failed to delete temporary branch $BACKUP_BRANCH.${NC}\n"
     fi
 }
@@ -132,11 +139,11 @@ printf "${YELLOW}Updating version and stable tag in README.md...${NC}\n"
 sed -i "s/^Stable tag: .*/Stable tag: $MAIN_VERSION/" README.md || handle_error "Failed to update stable tag in README.md"
 sed -i "s/badge\/v[0-9.]*\"/badge\/v$MAIN_VERSION\"/" README.md || handle_error "Failed to update badge version in README.md"
 
-# Update version, stable tag, and CC_PLUGIN_VERSION in cc-analytics.php
-printf "${YELLOW}Updating version, stable tag, and CC_PLUGIN_VERSION in cc-analytics.php...${NC}\n"
-sed -i "s/^ \* Version: .*/ \* Version: $MAIN_VERSION/" cc-analytics.php || handle_error "Failed to update version in cc-analytics.php"
-sed -i "s/^[[:space:]]*\* Stable Tag: .*/ \* Stable Tag: $MAIN_VERSION/" cc-analytics.php || handle_error "Failed to update stable tag in cc-analytics.php"
-sed -i "s/define( 'CC_PLUGIN_VERSION', '.*' );/define( 'CC_PLUGIN_VERSION', '$MAIN_VERSION' );/" cc-analytics.php || handle_error "Failed to update CC_PLUGIN_VERSION in cc-analytics.php"
+# Update version, stable tag, and CC_PLUGIN_VERSION in convertcart-plugin.php
+printf "${YELLOW}Updating version information in convertcart-plugin.php...${NC}\n"
+sed -i "s/^ \* Version: .*/ \* Version: $MAIN_VERSION/" convertcart-plugin.php || handle_error "Failed to update version in convertcart-plugin.php"
+sed -i "s/^ \* Stable Tag: .*/ \* Stable Tag: $MAIN_VERSION/" convertcart-plugin.php || handle_error "Failed to update stable tag in convertcart-plugin.php"
+sed -i "s/define( 'CC_PLUGIN_VERSION', '.*' );/define( 'CC_PLUGIN_VERSION', '$MAIN_VERSION' );/" convertcart-plugin.php || handle_error "Failed to update CC_PLUGIN_VERSION in convertcart-plugin.php"
 
 # Validate that the CHANGELOG.md is updated
 if ! grep -q "$MAIN_VERSION" CHANGELOG.md; then
@@ -145,8 +152,15 @@ fi
 
 # Commit changes for production tag if chosen
 if [ "$choice" = "1" ] || [ "$choice" = "3" ]; then
-    git add composer.json README.md includes/class-wc-cc-analytics.php cc-analytics.php CHANGELOG.md || handle_error "Failed to add files for beta commit"
+    git add composer.json README.md convertcart-plugin.php CHANGELOG.md || handle_error "Failed to add files for production commit"
     git commit -m "Release version $MAIN_VERSION" || handle_error "Failed to commit production changes"
+    
+    # Checkout master and merge changes
+    printf "${YELLOW}Checking out master branch and merging changes...${NC}\n"
+    git checkout master || handle_error "Failed to checkout master branch"
+    git merge $BACKUP_BRANCH || handle_error "Failed to merge changes into master"
+    
+    # Create and push the production tag
     git tag -a "$MAIN_VERSION" -m "Version $MAIN_VERSION" || handle_error "Failed to create production tag"
     
     # Push changes to master branch
@@ -159,6 +173,9 @@ if [ "$choice" = "1" ] || [ "$choice" = "3" ]; then
     
     printf "${GREEN}Production tag %s created and pushed successfully${NC}\n" "$MAIN_VERSION"
     printf "${GREEN}Changes pushed to master branch successfully${NC}\n"
+    
+    # Return to backup branch for potential beta tag creation
+    git checkout $BACKUP_BRANCH || handle_error "Failed to return to backup branch"
 fi
 
 # Update to beta version in composer.json
@@ -167,22 +184,22 @@ sed -i "s/\"version\": \"$MAIN_VERSION\"/\"version\": \"$BETA_VERSION\"/" compos
 
 # Update CDN URL for beta tag
 printf "${YELLOW}Updating CDN URL for beta tag...${NC}\n"
-sed -i "s/cdn\.convertcart\.com/cdn-beta.convertcart.com/g" includes/class-wc-cc-analytics.php || handle_error "Failed to update CDN URL for beta tag"
+sed -i "s/cdn\.convertcart\.com/cdn-beta.convertcart.com/g" includes/core/class-integration.php || handle_error "Failed to update CDN URL for beta tag"
 
-# Update stable tag, version, and CC_PLUGIN_VERSION in cc-analytics.php for beta version
-printf "${YELLOW}Updating stable tag, version, and CC_PLUGIN_VERSION in cc-analytics.php for beta...${NC}\n"
-sed -i "s/^ \* Version: .*/ \* Version: $BETA_VERSION/" cc-analytics.php || handle_error "Failed to update version for beta"
-sed -i "s/^[[:space:]]*\* Stable Tag: .*/ \* Stable Tag: $BETA_VERSION/" cc-analytics.php || handle_error "Failed to update stable tag for beta"
-sed -i "s/define('CC_PLUGIN_VERSION', '.*');/define('CC_PLUGIN_VERSION', '$BETA_VERSION');/" cc-analytics.php || handle_error "Failed to update CC_PLUGIN_VERSION for beta"
+# Update version information in convertcart-plugin.php for beta version
+printf "${YELLOW}Updating version information in convertcart-plugin.php for beta...${NC}\n"
+sed -i "s/^ \* Version: .*/ \* Version: $BETA_VERSION/" convertcart-plugin.php || handle_error "Failed to update version for beta"
+sed -i "s/^ \* Stable Tag: .*/ \* Stable Tag: $BETA_VERSION/" convertcart-plugin.php || handle_error "Failed to update stable tag for beta"
+sed -i "s/define( 'CC_PLUGIN_VERSION', '.*' );/define( 'CC_PLUGIN_VERSION', '$BETA_VERSION' );/" convertcart-plugin.php || handle_error "Failed to update CC_PLUGIN_VERSION for beta"
 
-# Update stable tag and version in README.md for beta version
-printf "${YELLOW}Updating stable tag and version in README.md for beta...${NC}\n"
-sed -i "s/Stable tag: .*/Stable tag: $BETA_VERSION/" README.md || handle_error "Failed to update stable tag for beta"
-sed -i "s/badge\/v[0-9.]*\"/badge\/v$BETA_VERSION\"/" README.md || handle_error "Failed to update badge version in README.md for beta"
+# Update version information in README.md for beta version
+printf "${YELLOW}Updating version information in README.md for beta...${NC}\n"
+sed -i "s/^Stable tag: .*/Stable tag: $BETA_VERSION/" README.md || handle_error "Failed to update stable tag for beta"
+sed -i "s/badge\/v[0-9.]*\"/badge\/v$BETA_VERSION\"/" README.md || handle_error "Failed to update badge version for beta"
 
 # Commit changes for beta tag if chosen
 if [ "$choice" = "2" ] || [ "$choice" = "3" ]; then
-    git add composer.json README.md includes/class-wc-cc-analytics.php cc-analytics.php CHANGELOG.md || handle_error "Failed to add files for beta commit"
+    git add composer.json README.md includes/core/class-integration.php convertcart-plugin.php CHANGELOG.md || handle_error "Failed to add files for beta commit"
     git commit -m "Release beta version $BETA_VERSION" || handle_error "Failed to commit beta version"
     git tag -a "$BETA_VERSION" -m "Beta version $BETA_VERSION" || handle_error "Failed to create beta tag"
     
