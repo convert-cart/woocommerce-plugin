@@ -13,6 +13,8 @@ namespace ConvertCart\Analytics\Core;
 
 use WP_REST_Request;
 
+defined( 'ABSPATH' ) || exit;
+
 class Integration extends \WC_Integration {
 
 	/**
@@ -26,6 +28,11 @@ class Integration extends \WC_Integration {
 	 * Init and hook in the integration.
 	 */
 	public function __construct() {
+		// Make sure WooCommerce is active
+		if ( ! class_exists( 'WC_Integration' ) ) {
+			return;
+		}
+
 		global $woocommerce;
 		$this->id                 = 'cc_analytics';
 		$this->method_title       = __( 'CC Analytics Settings', 'woocommerce_cc_analytics' );

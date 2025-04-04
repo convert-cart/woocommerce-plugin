@@ -63,8 +63,20 @@ spl_autoload_register(
  * Initialize the plugin.
  */
 function init() {
-	// Load core integration class.
-	require_once CC_PLUGIN_PATH . 'includes/core/class-integration.php';
+	// Check if WooCommerce is active
+	if ( ! class_exists( 'WooCommerce' ) ) {
+		add_action( 'admin_notices', function() {
+			?>
+			<div class="error">
+				<p><?php esc_html_e( 'Convert Cart Analytics requires WooCommerce to be installed and active.', 'woocommerce_cc_analytics' ); ?></p>
+			</div>
+			<?php
+		});
+		return;
+	}
+
+	// Now it's safe to include and use WooCommerce classes
+	require_once dirname( __FILE__ ) . '/includes/core/class-integration.php';
 
 	// Add the integration to WooCommerce.
 	add_filter( 'woocommerce_integrations', 'ConvertCart\Analytics\add_integration', 10 );
