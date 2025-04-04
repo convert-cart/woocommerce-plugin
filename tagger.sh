@@ -107,12 +107,20 @@ confirm_tag_deletion() {
     return 0
 }
 
+# Function to delete both local and remote tags
+delete_tag() {
+    local tag=$1
+    printf "${YELLOW}Deleting tag %s locally and remotely...${NC}\n" "$tag"
+    git tag -d "$tag" 2>/dev/null || true  # Delete local tag, don't error if it doesn't exist
+    git push origin ":refs/tags/$tag" 2>/dev/null || true  # Delete remote tag, don't error if it doesn't exist
+}
+
 # Check for existing remote tags
 if [ "$choice" = "1" ] || [ "$choice" = "3" ]; then
     if check_remote_tag_exists "$MAIN_VERSION"; then
         creation_date=$(get_tag_creation_date "$MAIN_VERSION")
         if confirm_tag_deletion "$MAIN_VERSION" "$creation_date"; then
-            git tag -d "$MAIN_VERSION" || handle_error "Failed to delete existing production tag"
+            delete_tag "$MAIN_VERSION" || handle_error "Failed to delete existing production tag"
         else
             printf "${GREEN}Skipping creation of production tag %s.${NC}\n" "$MAIN_VERSION"
         fi
@@ -123,7 +131,7 @@ if [ "$choice" = "2" ] || [ "$choice" = "3" ]; then
     if check_remote_tag_exists "$BETA_VERSION"; then
         creation_date=$(get_tag_creation_date "$BETA_VERSION")
         if confirm_tag_deletion "$BETA_VERSION" "$creation_date"; then
-            git tag -d "$BETA_VERSION" || handle_error "Failed to delete existing beta tag"
+            delete_tag "$BETA_VERSION" || handle_error "Failed to delete existing beta tag"
         else
             printf "${GREEN}Skipping creation of beta tag %s.${NC}\n" "$BETA_VERSION"
         fi
