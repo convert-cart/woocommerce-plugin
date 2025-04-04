@@ -333,23 +333,36 @@ class Integration extends \WC_Integration {
 	 * Add menu items.
 	 */
 	public function add_menu_items() {
-		$menu_slug = 'convert-cart-analytics-settings';
+		$parent_slug = 'convert-cart';
 
-		// Main Convert Cart menu item
-		add_submenu_page(
-			'woocommerce',
+		// Add top-level menu
+		add_menu_page(
 			__( 'Convert Cart Analytics', 'woocommerce_cc_analytics' ),
 			__( 'Convert Cart', 'woocommerce_cc_analytics' ),
 			'manage_woocommerce',
-			$menu_slug,
-			array( $this, 'redirect_to_settings' )
+			$parent_slug,
+			array( $this, 'render_settings_page' ),
+			'none'  // We'll use custom CSS for the icon
+		);
+
+		// Add custom menu icon CSS
+		add_action('admin_head', array($this, 'add_menu_icon_styles'));
+
+		// Add Settings submenu
+		add_submenu_page(
+			$parent_slug,
+			__( 'Convert Cart Settings', 'woocommerce_cc_analytics' ),
+			__( 'Domain Settings', 'woocommerce_cc_analytics' ),
+			'manage_woocommerce',
+			$parent_slug,
+			array( $this, 'render_settings_page' )
 		);
 
 		// SMS Consent submenu
 		add_submenu_page(
-			'woocommerce',
+			$parent_slug,
 			__( 'CC SMS Consent', 'woocommerce_cc_analytics' ),
-			__( 'CC SMS Consent', 'woocommerce_cc_analytics' ),
+			__( 'SMS Consent', 'woocommerce_cc_analytics' ),
 			'manage_woocommerce',
 			'convert-cart-sms-consent',
 			array( $this, 'render_sms_consent_page' )
@@ -357,26 +370,21 @@ class Integration extends \WC_Integration {
 
 		// Email Consent submenu
 		add_submenu_page(
-			'woocommerce',
+			$parent_slug,
 			__( 'CC Email Consent', 'woocommerce_cc_analytics' ),
-			__( 'CC Email Consent', 'woocommerce_cc_analytics' ),
+			__( 'Email Consent', 'woocommerce_cc_analytics' ),
 			'manage_woocommerce',
 			'convert-cart-email-consent',
 			array( $this, 'render_email_consent_page' )
 		);
-
-		// Handle the redirect on our custom menu page
-		if ( isset( $_GET['page'] ) && $_GET['page'] === $menu_slug ) {
-			wp_safe_redirect( admin_url( 'admin.php?page=wc-settings&tab=integration&section=' . $this->id ) );
-			exit;
-		}
 	}
 
 	/**
-	 * Redirect callback - this is required but won't be called due to our redirect
+	 * Render the main settings page
 	 */
-	public function redirect_to_settings() {
-		// This won't be called due to our redirect, but is required for add_submenu_page
+	public function render_settings_page() {
+		wp_safe_redirect( admin_url( 'admin.php?page=wc-settings&tab=integration&section=' . $this->id ) );
+		exit;
 	}
 
 	/**
@@ -387,6 +395,15 @@ class Integration extends \WC_Integration {
 	 */
 	public function highlight_menu_item( $parent_file ) {
 		global $current_screen;
+		$plugin_page = isset($_GET['page']) ? $_GET['page'] : '';
+		
+		if (in_array($plugin_page, array(
+			'convert-cart',
+			'convert-cart-sms-consent',
+			'convert-cart-email-consent'
+		))) {
+			return 'convert-cart';
+		}
 		
 		if ( isset( $_GET['page'] ) && 
 			 $_GET['page'] === 'wc-settings' && 
@@ -395,7 +412,7 @@ class Integration extends \WC_Integration {
 			 isset( $_GET['section'] ) && 
 			 $_GET['section'] === $this->id 
 		) {
-			$parent_file = 'woocommerce';
+			return 'convert-cart';
 		}
 		
 		return $parent_file;
@@ -408,6 +425,8 @@ class Integration extends \WC_Integration {
 	 * @return string
 	 */
 	public function highlight_submenu_item( $submenu_file ) {
+		$plugin_page = isset($_GET['page']) ? $_GET['page'] : '';
+		
 		if ( isset( $_GET['page'] ) && 
 			 $_GET['page'] === 'wc-settings' && 
 			 isset( $_GET['tab'] ) && 
@@ -415,7 +434,7 @@ class Integration extends \WC_Integration {
 			 isset( $_GET['section'] ) && 
 			 $_GET['section'] === $this->id 
 		) {
-			$submenu_file = 'convert-cart-analytics-settings';
+			return 'convert-cart';
 		}
 		
 		return $submenu_file;
@@ -475,5 +494,24 @@ class Integration extends \WC_Integration {
 				' . esc_html__( 'I consent to receive email communications.', 'woocommerce_cc_analytics' ) . '
 			</label>
 		</div>';
+	}
+
+	/**
+	 * Add custom menu icon styles
+	 */
+	public function add_menu_icon_styles() {
+		?>
+		<style>
+			#adminmenu .toplevel_page_convert-cart .wp-menu-image {
+				background-image: url('<?php echo esc_url(CC_PLUGIN_URL . 'assets/images/icon.svg'); ?>');
+				background-repeat: no-repeat;
+				background-position: center center;
+				background-size: 20px auto;
+			}
+			#adminmenu .toplevel_page_convert-cart .wp-menu-image:before {
+				content: none;
+			}
+		</style>
+		<?php
 	}
 }
