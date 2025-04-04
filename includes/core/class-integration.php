@@ -35,7 +35,7 @@ class Integration extends \WC_Integration {
 
 		global $woocommerce;
 		$this->id                 = 'cc_analytics';
-		$this->method_title       = __( 'CC Analytics Settings', 'woocommerce_cc_analytics' );
+		$this->method_title       = __( 'Convert Cart Analytics', 'woocommerce_cc_analytics' );
 		$this->method_description = __( 'Contact Convert Cart To Get Client ID / Domain Id', 'woocommerce_cc_analytics' );
 
 		// Load the settings.
@@ -47,6 +47,9 @@ class Integration extends \WC_Integration {
 
 		// Actions.
 		add_action( 'woocommerce_update_options_integration_' . $this->id, array( $this, 'process_admin_options' ) );
+		add_action( 'admin_menu', array( $this, 'add_menu_items' ), 15 );
+		add_filter( 'parent_file', array( $this, 'highlight_menu_item' ) );
+		add_filter( 'submenu_file', array( $this, 'highlight_submenu_item' ) );
 
 		// Initialize the plugin components.
 		$this->load_dependencies();
@@ -104,45 +107,45 @@ class Integration extends \WC_Integration {
 	}
 
 	/**
-	 * Initialize form fields.
+	 * Initialize integration form fields.
 	 */
 	public function init_form_fields() {
 		$this->form_fields = array(
-			'cc_client_id'         => array(
+			'cc_client_id' => array(
 				'title'       => __( 'Client ID / Domain Id', 'woocommerce_cc_analytics' ),
 				'type'        => 'text',
-				'description' => __( 'Enter your Convert Cart client ID or domain ID.', 'woocommerce_cc_analytics' ),
+				'description' => __( 'Contact Convert Cart To Get Client ID / Domain Id', 'woocommerce_cc_analytics' ),
 				'desc_tip'    => true,
 				'default'     => '',
 			),
-			'debug_mode'           => array(
+			'debug_mode' => array(
 				'title'       => __( 'Enable Debug Mode', 'woocommerce_cc_analytics' ),
 				'type'        => 'checkbox',
+				'label'       => __( 'Enable Debugging for Meta Info', 'woocommerce_cc_analytics' ),
+				'default'     => 'no',
 				'description' => __( 'If enabled, WooCommerce & WordPress plugin versions will be included in tracking metadata.', 'woocommerce_cc_analytics' ),
 			),
-			'enable_sms_consent'   => array(
+			'enable_sms_consent' => array(
 				'title'       => __( 'Enable SMS Consent', 'woocommerce_cc_analytics' ),
 				'type'        => 'select',
-				'description' => __( 'Enable SMS consent collection at checkout, registration, and account pages.', 'woocommerce_cc_analytics' ),
-				'default'     => 'disabled',
 				'options'     => array(
 					'disabled' => __( 'Disabled', 'woocommerce_cc_analytics' ),
-					'draft'    => __( 'Draft Mode (Admin Only)', 'woocommerce_cc_analytics' ),
-					'live'     => __( 'Live Mode', 'woocommerce_cc_analytics' ),
+					'draft'   => __( 'Draft Mode (Editable, not displayed on frontend)', 'woocommerce_cc_analytics' ),
+					'live'    => __( 'Live Mode (Editable, displayed on frontend)', 'woocommerce_cc_analytics' ),
 				),
-				'desc_tip'    => true,
+				'description' => __( 'Select the mode for SMS Consent: Draft to edit without injecting code, Live to edit with code injection.', 'woocommerce_cc_analytics' ),
+				'default'     => 'disabled',
 			),
 			'enable_email_consent' => array(
 				'title'       => __( 'Enable Email Consent', 'woocommerce_cc_analytics' ),
 				'type'        => 'select',
-				'description' => __( 'Enable Email consent collection at checkout, registration, and account pages.', 'woocommerce_cc_analytics' ),
-				'default'     => 'disabled',
 				'options'     => array(
 					'disabled' => __( 'Disabled', 'woocommerce_cc_analytics' ),
-					'draft'    => __( 'Draft Mode (Admin Only)', 'woocommerce_cc_analytics' ),
-					'live'     => __( 'Live Mode', 'woocommerce_cc_analytics' ),
+					'draft'   => __( 'Draft Mode (Editable, not displayed on frontend)', 'woocommerce_cc_analytics' ),
+					'live'    => __( 'Live Mode (Editable, displayed on frontend)', 'woocommerce_cc_analytics' ),
 				),
-				'desc_tip'    => true,
+				'description' => __( 'Select the mode for Email Consent: Draft to edit without injecting code, Live to edit with code injection.', 'woocommerce_cc_analytics' ),
+				'default'     => 'disabled',
 			),
 		);
 	}
@@ -151,14 +154,11 @@ class Integration extends \WC_Integration {
 	 * Output the settings form.
 	 */
 	public function admin_options() {
-		?>
-		<h2><?php esc_html_e( 'Convert Cart Analytics Settings', 'woocommerce_cc_analytics' ); ?></h2>
-		<p><?php esc_html_e( 'Configure your Convert Cart Analytics integration settings below.', 'woocommerce_cc_analytics' ); ?></p>
-		<table class="form-table">
-			<?php echo wp_kses_post( $this->generate_settings_html( null, false ) ); ?>
-		</table>
-		<?php
-		echo wp_kses_post( '<p>' . __( 'After saving your Client ID, you can configure SMS and Email consent settings in their respective tabs.', 'woocommerce_cc_analytics' ) . '</p>' );
+		echo '<h2>' . esc_html( $this->method_title ) . '</h2>';
+		echo wp_kses_post( wpautop( $this->method_description ) );
+		echo '<table class="form-table">';
+		$this->generate_settings_html();
+		echo '</table>';
 	}
 
 	/**
@@ -327,5 +327,153 @@ class Integration extends \WC_Integration {
 
 		$info['webhooks'] = $webhooks;
 		return $info;
+	}
+
+	/**
+	 * Add menu items.
+	 */
+	public function add_menu_items() {
+		$menu_slug = 'convert-cart-analytics-settings';
+
+		// Main Convert Cart menu item
+		add_submenu_page(
+			'woocommerce',
+			__( 'Convert Cart Analytics', 'woocommerce_cc_analytics' ),
+			__( 'Convert Cart', 'woocommerce_cc_analytics' ),
+			'manage_woocommerce',
+			$menu_slug,
+			array( $this, 'redirect_to_settings' )
+		);
+
+		// SMS Consent submenu
+		add_submenu_page(
+			'woocommerce',
+			__( 'CC SMS Consent', 'woocommerce_cc_analytics' ),
+			__( 'CC SMS Consent', 'woocommerce_cc_analytics' ),
+			'manage_woocommerce',
+			'convert-cart-sms-consent',
+			array( $this, 'render_sms_consent_page' )
+		);
+
+		// Email Consent submenu
+		add_submenu_page(
+			'woocommerce',
+			__( 'CC Email Consent', 'woocommerce_cc_analytics' ),
+			__( 'CC Email Consent', 'woocommerce_cc_analytics' ),
+			'manage_woocommerce',
+			'convert-cart-email-consent',
+			array( $this, 'render_email_consent_page' )
+		);
+
+		// Handle the redirect on our custom menu page
+		if ( isset( $_GET['page'] ) && $_GET['page'] === $menu_slug ) {
+			wp_safe_redirect( admin_url( 'admin.php?page=wc-settings&tab=integration&section=' . $this->id ) );
+			exit;
+		}
+	}
+
+	/**
+	 * Redirect callback - this is required but won't be called due to our redirect
+	 */
+	public function redirect_to_settings() {
+		// This won't be called due to our redirect, but is required for add_submenu_page
+	}
+
+	/**
+	 * Highlight the correct parent menu item
+	 *
+	 * @param string $parent_file The parent file.
+	 * @return string
+	 */
+	public function highlight_menu_item( $parent_file ) {
+		global $current_screen;
+		
+		if ( isset( $_GET['page'] ) && 
+			 $_GET['page'] === 'wc-settings' && 
+			 isset( $_GET['tab'] ) && 
+			 $_GET['tab'] === 'integration' && 
+			 isset( $_GET['section'] ) && 
+			 $_GET['section'] === $this->id 
+		) {
+			$parent_file = 'woocommerce';
+		}
+		
+		return $parent_file;
+	}
+
+	/**
+	 * Highlight the correct submenu item
+	 *
+	 * @param string $submenu_file The submenu file.
+	 * @return string
+	 */
+	public function highlight_submenu_item( $submenu_file ) {
+		if ( isset( $_GET['page'] ) && 
+			 $_GET['page'] === 'wc-settings' && 
+			 isset( $_GET['tab'] ) && 
+			 $_GET['tab'] === 'integration' && 
+			 isset( $_GET['section'] ) && 
+			 $_GET['section'] === $this->id 
+		) {
+			$submenu_file = 'convert-cart-analytics-settings';
+		}
+		
+		return $submenu_file;
+	}
+
+	/**
+	 * Render SMS consent settings page
+	 */
+	public function render_sms_consent_page() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'woocommerce_cc_analytics' ) );
+		}
+
+		$consent_mode = $this->get_option( 'enable_sms_consent', 'disabled' );
+		$checkout_html = get_option( 'cc_sms_consent_checkout_html', $this->get_default_sms_consent_html() );
+		$registration_html = get_option( 'cc_sms_consent_registration_html', $this->get_default_sms_consent_html() );
+		$account_html = get_option( 'cc_sms_consent_account_html', $this->get_default_sms_consent_html() );
+
+		include plugin_dir_path( __DIR__ ) . 'admin/views/html-consent-settings.php';
+	}
+
+	/**
+	 * Render Email consent settings page
+	 */
+	public function render_email_consent_page() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'woocommerce_cc_analytics' ) );
+		}
+
+		$consent_mode = $this->get_option( 'enable_email_consent', 'disabled' );
+		$checkout_html = get_option( 'cc_email_consent_checkout_html', $this->get_default_email_consent_html() );
+		$registration_html = get_option( 'cc_email_consent_registration_html', $this->get_default_email_consent_html() );
+		$account_html = get_option( 'cc_email_consent_account_html', $this->get_default_email_consent_html() );
+
+		include plugin_dir_path( __DIR__ ) . 'admin/views/html-consent-settings.php';
+	}
+
+	/**
+	 * Get default SMS consent HTML
+	 */
+	private function get_default_sms_consent_html() {
+		return '<div class="sms-consent-checkbox">
+			<label for="sms_consent">
+				<input type="checkbox" name="sms_consent" id="sms_consent">
+				' . esc_html__( 'I consent to receive SMS communications.', 'woocommerce_cc_analytics' ) . '
+			</label>
+		</div>';
+	}
+
+	/**
+	 * Get default Email consent HTML
+	 */
+	private function get_default_email_consent_html() {
+		return '<div class="email-consent-checkbox">
+			<label for="email_consent">
+				<input type="checkbox" name="email_consent" id="email_consent">
+				' . esc_html__( 'I consent to receive email communications.', 'woocommerce_cc_analytics' ) . '
+			</label>
+		</div>';
 	}
 }

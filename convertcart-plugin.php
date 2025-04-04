@@ -95,16 +95,7 @@ function add_integration( $integrations ) {
 		return $integrations;
 	}
 
-	$integration_path = plugin_dir_path( __FILE__ ) . 'includes/core/class-integration.php';
-
-	if ( file_exists( $integration_path ) ) {
-		include_once $integration_path;
-		$integrations[] = 'ConvertCart\Analytics\Core\Integration';
-	} elseif ( defined( 'WP_DEBUG' ) && WP_DEBUG === true ) {
-		// phpcs:disable WordPress.PHP.DevelopmentFunctions
-		error_log( 'ConvertCart integration file not found: ' . $integration_path );
-		// phpcs:enable
-	}
+	$integrations[] = 'ConvertCart\Analytics\Core\Integration';
 
 	return $integrations;
 }
