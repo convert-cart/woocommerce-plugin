@@ -98,7 +98,8 @@ get_tag_creation_date() {
 
 # Function to confirm tag deletion
 confirm_tag_deletion() {
-    echo -n "${YELLOW}Tag '$1' already exists on remote (created on: $2). \nDo you want to delete it and recreate it? (y/n): ${NC}"
+    printf "${YELLOW}Tag '$1' already exists on remote (created on: $2).\n"
+    printf "Do you want to delete it and recreate it? (y/n): ${NC}"
     read response
     if [ "$response" != "y" ]; then
         printf "${YELLOW}Keeping existing tag '%s'. Skipping creation...${NC}\n" "$1"
