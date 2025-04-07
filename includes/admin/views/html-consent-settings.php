@@ -22,17 +22,17 @@ if ( ! defined( 'ABSPATH' ) ) {
         
         <h2><?php esc_html_e( 'Checkout Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
         <div class="code-editor-wrapper">
-            <textarea id="checkout_html" name="checkout_html" rows="5" cols="50" class="large-text code consent-html-editor"><?php echo esc_textarea( $checkout_html ); ?></textarea>
+            <textarea id="checkout_html" name="<?php echo strpos($checkout_html, 'sms') !== false ? 'cc_sms_consent_checkout_html' : 'cc_email_consent_checkout_html'; ?>" rows="5" cols="50" class="large-text code consent-html-editor"><?php echo esc_textarea( $checkout_html ); ?></textarea>
         </div>
 
         <h2><?php esc_html_e( 'Registration Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
         <div class="code-editor-wrapper">
-            <textarea id="registration_html" name="registration_html" rows="5" cols="50" class="large-text code consent-html-editor"><?php echo esc_textarea( $registration_html ); ?></textarea>
+            <textarea id="registration_html" name="<?php echo strpos($registration_html, 'sms') !== false ? 'cc_sms_consent_registration_html' : 'cc_email_consent_registration_html'; ?>" rows="5" cols="50" class="large-text code consent-html-editor"><?php echo esc_textarea( $registration_html ); ?></textarea>
         </div>
 
         <h2><?php esc_html_e( 'My Account Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
         <div class="code-editor-wrapper">
-            <textarea id="account_html" name="account_html" rows="5" cols="50" class="large-text code consent-html-editor"><?php echo esc_textarea( $account_html ); ?></textarea>
+            <textarea id="account_html" name="<?php echo strpos($account_html, 'sms') !== false ? 'cc_sms_consent_account_html' : 'cc_email_consent_account_html'; ?>" rows="5" cols="50" class="large-text code consent-html-editor"><?php echo esc_textarea( $account_html ); ?></textarea>
         </div>
 
         <?php submit_button(); ?>
