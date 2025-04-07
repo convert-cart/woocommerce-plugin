@@ -36,7 +36,7 @@ class Email_Consent extends Base_Consent {
 	 * @return string
 	 */
 	protected function get_default_checkout_html() {
-		return '<div class="email-consent-checkbox">
+		return '<div class="email-consent-checkbox form-row">
 			<label for="email_consent">
 				<input type="checkbox" name="email_consent" id="email_consent" />
 				<span>' . esc_html__( 'I consent to receive email communications.', 'woocommerce_cc_analytics' ) . '</span>
@@ -50,10 +50,10 @@ class Email_Consent extends Base_Consent {
 	 * @return string
 	 */
 	protected function get_default_registration_html() {
-		return '<div class="email-consent-checkbox">
+		return '<div class="email-consent-checkbox form-row">
 			<label for="email_consent">
 				<input type="checkbox" name="email_consent" id="email_consent" />
-				<span>' . esc_html__( 'I consent to receive email communications', 'woocommerce_cc_analytics' ) . '</span>
+				<span>' . esc_html__('I consent to receive email communications', 'woocommerce_cc_analytics') . '</span>
 			</label>
 		</div>';
 	}

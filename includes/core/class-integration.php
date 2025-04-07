@@ -596,6 +596,60 @@ class Integration extends \WC_Integration {
 				vertical-align: middle;
 				display: inline;
 			}
+			
+			/* Checkout form consent styles */
+			.woocommerce-checkout .sms-consent-checkbox,
+			.woocommerce-checkout .email-consent-checkbox {
+				margin: 1em 0;
+				padding: 0;
+				clear: both;
+			}
+			
+			.woocommerce-checkout .sms-consent-checkbox label,
+			.woocommerce-checkout .email-consent-checkbox label {
+				display: flex;
+				align-items: flex-start;
+				margin: 0;
+				cursor: pointer;
+			}
+			
+			.woocommerce-checkout .sms-consent-checkbox input[type="checkbox"],
+			.woocommerce-checkout .email-consent-checkbox input[type="checkbox"] {
+				margin: 3px 8px 0 0;
+			}
+			
+			.woocommerce-checkout .sms-consent-checkbox span,
+			.woocommerce-checkout .email-consent-checkbox span {
+				flex: 1;
+				line-height: 1.5;
+			}
+			
+			/* Registration form consent styles */
+			.woocommerce-form-register .sms-consent-checkbox,
+			.woocommerce-form-register .email-consent-checkbox {
+				margin: 1em 0;
+				padding: 0;
+				clear: both;
+			}
+			
+			.woocommerce-form-register .sms-consent-checkbox label,
+			.woocommerce-form-register .email-consent-checkbox label {
+				display: flex;
+				align-items: flex-start;
+				margin: 0;
+				cursor: pointer;
+			}
+			
+			.woocommerce-form-register .sms-consent-checkbox input[type="checkbox"],
+			.woocommerce-form-register .email-consent-checkbox input[type="checkbox"] {
+				margin: 3px 8px 0 0;
+			}
+			
+			.woocommerce-form-register .sms-consent-checkbox span,
+			.woocommerce-form-register .email-consent-checkbox span {
+				flex: 1;
+				line-height: 1.5;
+			}
 		</style>
 		<?php
 	}

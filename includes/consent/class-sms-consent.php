@@ -45,7 +45,7 @@ class SMS_Consent extends Base_Consent {
 	 * @return string
 	 */
 	protected function get_default_checkout_html() {
-		return '<div class="sms-consent-checkbox">
+		return '<div class="sms-consent-checkbox form-row">
 			<label for="sms_consent">
 				<input type="checkbox" name="sms_consent" id="sms_consent" />
 				<span>' . esc_html__( 'I consent to receive SMS communications.', 'woocommerce_cc_analytics' ) . '</span>
@@ -59,7 +59,7 @@ class SMS_Consent extends Base_Consent {
 	 * @return string
 	 */
 	protected function get_default_registration_html() {
-		return '<div class="sms-consent-checkbox">
+		return '<div class="sms-consent-checkbox form-row">
 			<label for="sms_consent">
 				<input type="checkbox" name="sms_consent" id="sms_consent" />
 				<span>' . esc_html__( 'I consent to receive SMS communications', 'woocommerce_cc_analytics' ) . '</span>
