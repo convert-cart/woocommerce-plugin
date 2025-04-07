@@ -13,38 +13,9 @@ namespace ConvertCart\Analytics;
 
 use WP_REST_Request;
 
-// Restore inheritance from WC_Integration
 class WC_CC_Analytics extends \WC_Integration {
 
-	/**
-	 * Integration ID.
-	 * @var string
-	 */
-	public $id = 'cc_analytics'; // Declare and initialize
 
-	/**
-	 * Integration method title.
-	 * @var string
-	 */
-	public $method_title; // Declare
-
-	/**
-	 * Integration method description.
-	 * @var string
-	 */
-	public $method_description; // Declare
-
-	/**
-	 * Form fields for settings.
-	 * @var array
-	 */
-	public $form_fields = []; // Declare
-
-	/**
-	 * Settings values.
-	 * @var array
-	 */
-	public $settings = []; // Declare
 
 	/**
 	 * Client ID.
@@ -54,307 +25,183 @@ class WC_CC_Analytics extends \WC_Integration {
 	public $cc_client_id;
 
 	/**
-	 * Debug mode setting.
-	 * @var string ('yes' or 'no')
-	 */
-	public $debug_mode = 'no';
-
-	/**
-	 * SMS Consent setting.
-	 * @var string ('disabled', 'draft', 'live')
-	 */
-	public $enable_sms_consent = 'disabled';
-
-	/**
-	 * Email Consent setting.
-	 * @var string ('disabled', 'draft', 'live')
-	 */
-	public $enable_email_consent = 'disabled';
-
-	/**
-	 * Consent instances.
-	 * @var array<string, \ConvertCart\Analytics\Consent\Base_Consent>
-	 */
-	public $consent_handlers = [];
-
-	/**
-	 * Flag to ensure block data filter is added only once.
-	 * @var bool
-	 */
-	private $block_data_filter_added = false;
-
-	/**
-	 * Constructor - Sets up initial hooks.
+	 * Init and hook in the integration.
 	 */
 	public function __construct() {
-		// $this->id is now initialized in property declaration
+		global $woocommerce;
+		$this->id                 = 'cc_analytics';
 		$this->method_title       = __( 'CC Analytics Settings', 'woocommerce_cc_analytics' );
 		$this->method_description = __( 'Contact Convert Cart To Get Client ID / Domain Id', 'woocommerce_cc_analytics' );
 
-		// Load settings form fields
-		$this->init_form_fields();
-
-		// Load the settings values themselves
-		$this->init_settings(); // This loads saved options into $this->settings
-
-		// Assign main settings to properties
-		$this->cc_client_id = $this->get_option( 'cc_client_id' );
-
-		// Hook for saving settings in admin
-		add_action( 'woocommerce_update_options_integration_' . $this->id, array( $this, 'process_admin_options' ) );
-
-		// --- Core Hooks Setup ---
-		// Defer consent initialization and hook setup until template_redirect
-		add_action('template_redirect', array($this, 'initialize_consent_handlers'), 5);
-
-		// Hooks that need to run on woocommerce_init
-		add_action('woocommerce_init', array($this, 'woocommerce_init_hooks'));
-
-		// Hooks for analytics tracking (if client ID is set)
-		if ( ! empty($this->cc_client_id) ) {
-		add_action( 'wp_head', array( $this, 'cc_init' ) );
-		add_action( 'wp_footer', array( $this, 'addEvents' ) );
-		add_action( 'woocommerce_thankyou', array( $this, 'ordered' ) );
-			// ... other tracking hooks ...
-		}
-
-		// Hooks for REST API endpoints
-		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
-
-		// Hooks for category webhooks
-		add_action( 'create_product_cat', array( $this, 'handle_category_created' ), 10, 2 );
-		add_action( 'edit_product_cat', array( $this, 'handle_category_updated' ), 10, 2 );
-		add_action( 'delete_product_cat', array( $this, 'handle_category_deleted' ), 10, 2 );
-		add_action( 'woocommerce_admin_product_category_webhook_handler', array( $this, 'sendCategoryRelatedNotification' ), 10, 1 );
-
-		// Hook for WP-CLI commands
-		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			add_action( 'init', array( $this, 'register_cli_commands' ) );
-		}
-
-		$this->log_debug('WC_CC_Analytics Constructor finished.');
-	}
-
-	/**
-	 * Register REST API routes.
-	 */
-	public function register_rest_routes() {
-				register_rest_route(
-					'wc/v3',
-					'cc-version',
-			array( /* ... */ )
-		);
-				register_rest_route(
-			'wc/v3',
-			'cc-plugin-info',
-			array( /* ... */ )
-		);
-		// Add other routes here
-		$this->log_debug('REST routes registered.');
-	}
-
-	/**
-	 * Handle category created webhook trigger.
-	 */
-	public function handle_category_created( $term_id, $args ) {
-		do_action( 'woocommerce_admin_product_category_webhook_handler', [ /* ... */ ] );
-	}
-	// ... handle_category_updated, handle_category_deleted ...
-
-
-	/**
-	 * Initialize consent handlers and setup their hooks.
-	 * Runs on template_redirect.
-	 */
-	public function initialize_consent_handlers() {
-		// Add log right at the start
-		error_log('Convert Cart: ENTERING initialize_consent_handlers [Hook: ' . current_filter() . ']');
-		$this->log_debug('Initializing consent handlers on template_redirect.');
-
-		// Check if WooCommerce is available and we are on a relevant page
-		if (!function_exists('is_checkout') || !function_exists('is_account_page')) {
-			$this->log_debug('Exiting consent init: Required WC functions not found.');
-			error_log('Convert Cart: EXITING initialize_consent_handlers (WC functions missing)');
-			return;
-		}
-
-		// Only initialize on checkout page for now
-		if (!is_checkout()) {
-			$this->log_debug('Exiting consent init: Not on checkout page.');
-			error_log('Convert Cart: EXITING initialize_consent_handlers (Not checkout page)');
-			return;
-		}
-		error_log('Convert Cart: initialize_consent_handlers - Passed page check (is_checkout).');
-
-		// Reset handlers array for this request
-		$this->consent_handlers = [];
-		$block_checkout_detected = false; // Flag to check if we need the block filter
-
-		// Instantiate SMS Consent if enabled
-		if (class_exists('ConvertCart\Analytics\Consent\SMS_Consent') && $this->enable_sms_consent !== 'disabled') {
-			$this->log_debug('Instantiating SMS Consent handler.');
-			error_log('Convert Cart: Instantiating SMS Consent handler.');
-			$sms_consent = new Consent\SMS_Consent($this);
-			if ($sms_consent->is_enabled()) {
-				$this->log_debug('SMS Consent is enabled, setting up hooks.');
-				error_log('Convert Cart: Calling SMS setup_hooks.');
-				$sms_consent->setup_hooks(); // setup_hooks will determine if it's block or classic
-				$this->consent_handlers['sms'] = $sms_consent;
-				// Check if block checkout was detected by this handler
-				if ($sms_consent->is_block_checkout()) {
-					$block_checkout_detected = true;
-				}
-			} else {
-				$this->log_debug('SMS Consent instantiated but not enabled (draft mode?).');
-				error_log('Convert Cart: SMS Consent instantiated but not enabled.');
-			}
-		} else {
-			$this->log_debug('SMS Consent class not found or setting is disabled.');
-			error_log('Convert Cart: SMS Consent class/setting check failed.');
-		}
-
-		// Instantiate Email Consent if enabled
-		if (class_exists('ConvertCart\Analytics\Consent\Email_Consent') && $this->enable_email_consent !== 'disabled') {
-			$this->log_debug('Instantiating Email Consent handler.');
-			error_log('Convert Cart: Instantiating Email Consent handler.');
-			$email_consent = new Consent\Email_Consent($this);
-			if ($email_consent->is_enabled()) {
-				$this->log_debug('Email Consent is enabled, setting up hooks.');
-				error_log('Convert Cart: Calling Email setup_hooks.');
-				$email_consent->setup_hooks(); // setup_hooks will determine if it's block or classic
-				$this->consent_handlers['email'] = $email_consent;
-				// Check if block checkout was detected by this handler
-				if ($email_consent->is_block_checkout()) {
-					$block_checkout_detected = true;
-				}
-			} else {
-				$this->log_debug('Email Consent instantiated but not enabled (draft mode?).');
-				error_log('Convert Cart: Email Consent instantiated but not enabled.');
-			}
-		} else {
-			$this->log_debug('Email Consent class not found or setting is disabled.');
-			error_log('Convert Cart: Email Consent class/setting check failed.');
-		}
-
-		// --- ADD THE BLOCK DATA FILTER HERE (ONLY ONCE) ---
-		// Check if block checkout was detected by *any* handler and the filter hasn't been added yet
-		if ($block_checkout_detected && !$this->block_data_filter_added) {
-			$this->log_debug('Block checkout detected, adding the woocommerce_blocks_checkout_render_block_data filter.');
-			error_log('Convert Cart: Adding woocommerce_blocks_checkout_render_block_data filter.');
-			add_filter('woocommerce_blocks_checkout_render_block_data', array($this, 'add_all_consent_to_block_checkout_data'), 10, 1);
-			$this->block_data_filter_added = true; // Set flag
-		} elseif ($block_checkout_detected && $this->block_data_filter_added) {
-			$this->log_debug('Block checkout detected, but filter already added for this request.');
-			error_log('Convert Cart: Block data filter already added.');
-		}
-
-
-		$this->log_debug('Consent handlers initialization complete.');
-		error_log('Convert Cart: FINISHED initialize_consent_handlers.');
-	}
-
-	/**
-	 * NEW METHOD: Add consent HTML for all enabled handlers to block checkout data.
-	 * Hooked to woocommerce_blocks_checkout_render_block_data.
-	 *
-	 * @param array $data Block data.
-	 * @return array Modified block data.
-	 */
-	public function add_all_consent_to_block_checkout_data($data) {
-		$this->log_debug('Running add_all_consent_to_block_checkout_data filter callback.');
-		error_log('Convert Cart: Running add_all_consent_to_block_checkout_data filter.');
-
-		// Explicitly check if the handlers array is populated *at this point*
-		if (empty($this->consent_handlers)) {
-			$this->log_debug('CRITICAL: $this->consent_handlers is EMPTY inside the filter callback.');
-			error_log('Convert Cart: CRITICAL - consent_handlers is EMPTY in filter callback.');
-			// Log the state of the main settings just in case
-			error_log('Convert Cart: Current settings in filter: ' . print_r($this->settings, true));
-			return $data; // Exit early if no handlers are registered
-		} else {
-			$this->log_debug('Filter Callback: $this->consent_handlers contains keys: ' . implode(', ', array_keys($this->consent_handlers)));
-			error_log('Convert Cart: Filter Callback - consent_handlers keys: ' . implode(', ', array_keys($this->consent_handlers)));
-		}
-
-		// Ensure the extensions structure exists
-		if (!isset($data['extensions'])) {
-			$data['extensions'] = array();
-		}
-		if (!isset($data['extensions']['convertcart-analytics'])) {
-			$data['extensions']['convertcart-analytics'] = array();
-		}
-
-		// Loop through the instantiated handlers
-		foreach ($this->consent_handlers as $type => $handler) {
-			// Ensure $handler is a valid object
-			if (!is_object($handler) || !method_exists($handler, 'is_enabled') || !method_exists($handler, 'get_consent_html')) {
-				$this->log_debug("Filter Callback: Invalid handler object for type '{$type}'. Skipping.");
-				error_log("Convert Cart: Filter Callback - Invalid handler object for type '{$type}'.");
-				continue;
-			}
-
-			$this->log_debug("Filter Callback: Processing handler: " . $type);
-			error_log("Convert Cart: Filter Callback - Processing handler: " . $type);
-
-			// Check if this specific handler is enabled for 'live' mode
-			$is_live = $handler->is_enabled('live'); // Store result
-			$this->log_debug("Filter Callback: Handler '{$type}' is_enabled('live') check returned: " . ($is_live ? 'Yes' : 'No'));
-			error_log("Convert Cart: Filter Callback - Handler '{$type}' is_live: " . ($is_live ? 'Yes' : 'No'));
-
-			if ($is_live) {
-				$this->log_debug("Filter Callback: Handler '{$type}' is live. Getting HTML.");
-				error_log("Convert Cart: Filter Callback - Handler '{$type}' is live. Getting HTML.");
-				// Get the HTML using the handler's method
-				$consent_html = $handler->get_consent_html('checkout');
-				// Log the raw HTML fetched
-				$this->log_debug("Filter Callback: Handler '{$type}' get_consent_html('checkout') returned: " . $consent_html);
-				error_log("Convert Cart: Filter Callback - Handler '{$type}' HTML: " . $consent_html);
-
-				// Add it to the block data only if HTML is not empty
-				if (!empty($consent_html)) {
-					$data['extensions']['convertcart-analytics'][$type . '_consent_html'] = $consent_html;
-					$this->log_debug("Filter Callback: Added {$type}_consent_html to block data.");
-					error_log("Convert Cart: Filter Callback - Added {$type}_consent_html to block data.");
-				} else {
-					$this->log_debug("Filter Callback: Handler '{$type}' returned EMPTY HTML. Not adding to data.");
-					error_log("Convert Cart: Filter Callback - Handler '{$type}' returned EMPTY HTML.");
-				}
-
-			} else {
-				$this->log_debug("Filter Callback: Handler '{$type}' is not live. Skipping HTML addition.");
-				error_log("Convert Cart: Filter Callback - Handler '{$type}' is not live. Skipping.");
-			}
-		}
-
-		// Log the final data structure just before returning
-		$this->log_debug('Filter Callback: Final block data structure: ' . print_r($data, true));
-		error_log('Convert Cart: Filter Callback - Final block data: ' . print_r($data, true));
-
-		return $data;
-	}
-
-	/**
-	 * Hooks that need to run on woocommerce_init.
-	 */
-	public function woocommerce_init_hooks() {
-		$this->log_debug('Running woocommerce_init hooks.');
-		// Add hooks here that specifically depend on WC()->cart, WC()->session etc.
-		// Example: add_action('woocommerce_add_to_cart', array($this, 'track_add_to_cart'));
-	}
-
-	/**
-	 * Initialize the plugin. Load settings and hooks.
-	 * REMOVE consent initialization from here if it was present.
-	 */
-	public function init() {
-		// Load settings.
+		// Load the settings.
 		$this->init_form_fields();
 		$this->init_settings();
 
-		// ... (other init logic) ...
+		// Define user set variables.
+		$this->cc_client_id = $this->get_option( 'cc_client_id' );
+		add_action( 'woocommerce_update_options_integration_' . $this->id, array( $this, 'process_admin_options' ) );
 
-		// ... (other hooks added in init) ...
-		$this->log_debug('Core plugin init complete.');
+		if ( ! isset( $this->cc_client_id ) || '' === $this->cc_client_id ) {
+			return;
+		}
+
+		// Actions added below.
+		add_action( 'wp_head', array( $this, 'cc_init' ) );
+		add_action( 'wp_footer', array( $this, 'addEvents' ) );
+		add_action( 'woocommerce_thankyou', array( $this, 'ordered' ) );
+		add_action(
+			'create_product_cat',
+			function ( $term_id, $args ) {
+				do_action(
+					'woocommerce_admin_product_category_webhook_handler',
+					array(
+						'term'     => $term_id,
+						'topic'    => 'category.created',
+						'category' => $args,
+					)
+				);
+			},
+			10,
+			3
+		);
+		add_action(
+			'edit_product_cat',
+			function ( $term_id, $args ) {
+				do_action(
+					'woocommerce_admin_product_category_webhook_handler',
+					array(
+						'term'     => $term_id,
+						'topic'    => 'category.updated',
+						'category' => $args,
+					)
+				);
+			},
+			10,
+			3
+		);
+		add_action(
+			'delete_product_cat',
+			function ( $term_id, $tt_id = '' ) {
+				do_action(
+					'woocommerce_admin_product_category_webhook_handler',
+					array(
+						'term'  => $term_id,
+						'topic' => 'category.deleted',
+					)
+				);
+			},
+			10,
+			3
+		);
+		add_action( 'woocommerce_admin_product_category_webhook_handler', array( $this, 'sendCategoryRelatedNotification' ), 10, 1 );
+		add_action(
+			'rest_api_init',
+			function () {
+				register_rest_route(
+					'wc/v3',
+					'cc-version',
+					array(
+						'methods'             => 'GET',
+						'callback'            => array( $this, 'getVersionList' ),
+						'permission_callback' => array( $this, 'permissionCallback' ),
+					)
+				);
+			}
+		);
+		add_action(
+			'rest_api_init',
+			function () {
+				register_rest_route(
+					'wc/v3', // Namespace
+					'cc-plugin-info', // Route
+					array(
+						'methods'             => 'GET', // HTTP method
+						'callback'            => array( $this, 'get_plugin_info' ), // Callback function
+						'permission_callback' => array( $this, 'permissionCallback' ), // Permission check
+					)
+				);
+			}
+		);
+
+		// Filters
+		add_filter(
+			'woocommerce_rest_product_object_query',
+			function ( array $args, \WP_REST_Request $request ) {
+				$modified_after = $request->get_param( 'modified_after' );
+
+				if ( ! $modified_after ) {
+					return $args;
+				}
+
+				$args['date_query'][0]['column'] = 'post_modified';
+				$args['date_query'][0]['after']  = $modified_after;
+
+				return $args;
+			},
+			10,
+			2
+		);
+
+		add_filter(
+			'woocommerce_rest_orders_prepare_object_query',
+			function ( array $args, \WP_REST_Request $request ) {
+				$modified_after = $request->get_param( 'modified_after' );
+				if ( ! $modified_after ) {
+					return $args;
+				}
+
+				$args['date_query'][0]['column'] = 'post_modified';
+				$args['date_query'][0]['after']  = $modified_after;
+				return $args;
+			},
+			10,
+			2
+		);
+
+		add_filter( 'woocommerce_rest_customer_query', array( $this, 'addUpdatedSinceFilterToRESTApi' ), 10, 2 );
+		add_filter( 'rest_product_collection_params', array( $this, 'maximum_api_filter' ) );
+		add_action( 'woocommerce_review_order_before_submit', array( $this, 'add_sms_consent_checkbox' ) );
+		add_action( 'woocommerce_review_order_before_submit', array( $this, 'add_email_consent_checkbox' ) );
+		add_action( 'woocommerce_checkout_create_order', array( $this, 'save_sms_consent_to_order_or_customer' ), 10, 2 );
+		add_action( 'woocommerce_checkout_create_order', array( $this, 'save_email_consent_to_order_or_customer' ), 10, 2 );
+		add_action( 'woocommerce_created_customer', array( $this, 'save_sms_consent_when_account_is_created' ), 10, 3 );
+		add_action( 'woocommerce_created_customer', array( $this, 'save_email_consent_when_account_is_created' ), 10, 3 );
+		add_action( 'woocommerce_edit_account_form', array( $this, 'add_sms_consent_checkbox_to_account_page' ) );
+		add_action( 'woocommerce_edit_account_form', array( $this, 'add_email_consent_checkbox_to_account_page' ) );
+		add_action( 'woocommerce_save_account_details', array( $this, 'save_sms_consent_from_account_page' ), 12, 1 );
+		add_action( 'woocommerce_save_account_details', array( $this, 'save_email_consent_from_account_page' ), 12, 1 );
+		add_action( 'woocommerce_register_form', array( $this, 'add_sms_consent_to_registration_form' ) );
+		add_action( 'woocommerce_register_form', array( $this, 'add_email_consent_to_registration_form' ) );
+		add_action( 'woocommerce_created_customer', array( $this, 'save_sms_consent_from_registration_form' ), 10, 1 );
+		add_action( 'woocommerce_created_customer', array( $this, 'save_email_consent_from_registration_form' ), 10, 1 );
+		add_action( 'woocommerce_created_customer', array( $this, 'update_consent_from_previous_orders' ), 20, 3 );
+		add_action( 'woocommerce_created_customer', array( $this, 'update_consent_from_previous_orders_email' ), 20, 3 );
+		add_action( 'admin_menu', array( $this, 'add_convert_cart_menu' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_codemirror_assets' ) );
+
+		if (defined('WP_CLI') && WP_CLI) {
+			WP_CLI::add_command('cc-consent', function($args, $assoc_args) {
+				$user_id = $assoc_args['user'] ?? get_current_user_id();
+				
+				// Check SMS consent
+				$sms_consent = get_user_meta($user_id, 'sms_consent', true);
+				WP_CLI::line(sprintf('SMS Consent for user %d: %s', $user_id, $sms_consent ?: 'not set'));
+				
+				// Check Email consent
+				$email_consent = get_user_meta($user_id, 'email_consent', true);
+				WP_CLI::line(sprintf('Email Consent for user %d: %s', $user_id, $email_consent ?: 'not set'));
+			}, array(
+				'shortdesc' => 'Check consent status for a user',
+				'synopsis' => array(
+					array(
+						'type'        => 'assoc',
+						'name'        => 'user',
+						'description' => 'User ID to check',
+						'optional'    => true,
+					),
+				),
+			));
+		}
 	}
 
 	/**
@@ -405,14 +252,12 @@ class WC_CC_Analytics extends \WC_Integration {
 	 * Initialize integration settings.
 	 */
 	public function init_settings() {
-		// Let the parent WC_Integration handle loading settings
-		parent::init_settings();
-
-		// Now assign specific settings to our declared properties after parent loads them
-		$this->cc_client_id         = $this->get_option('cc_client_id');
-		$this->debug_mode           = $this->get_option('debug_mode', 'no'); // Use default if not set
-		$this->enable_sms_consent   = $this->get_option('enable_sms_consent', 'disabled');
-		$this->enable_email_consent = $this->get_option('enable_email_consent', 'disabled');
+		$this->settings = get_option( $this->plugin_id . $this->id . '_settings', null );
+		if ( is_array( $this->settings ) ) {
+			foreach ( $this->settings as $key => $value ) {
+				$this->$key = $value;
+			}
+		}
 	}
 
 	/**
@@ -1415,22 +1260,5 @@ class WC_CC_Analytics extends \WC_Integration {
 
 		$info['webhooks'] = $webhooks;
 		return $info;
-    }
-
-	/**
-	 * Debug logging helper specific to this integration class.
-	 * Checks if WP_DEBUG is enabled.
-	 *
-	 * @param string $message Message to log.
-	 */
-	public function log_debug( $message ) {
-		// Check WP_DEBUG constant instead of the setting
-		if ( defined('WP_DEBUG') && WP_DEBUG === true ) {
-			if ( is_array( $message ) || is_object( $message ) ) {
-				$message = print_r( $message, true );
-			}
-			// Add a prefix to distinguish these logs
-			error_log( 'Convert Cart Integration Debug: ' . $message );
-		}
     }
 }
