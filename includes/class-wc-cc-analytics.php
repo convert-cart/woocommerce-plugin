@@ -164,35 +164,23 @@ class WC_CC_Analytics extends \WC_Integration {
 
 	/**
 	 * Initialize consent handlers and setup their hooks.
-	 * Runs on template_redirect.
 	 */
 	public function initialize_consent_handlers() {
-		$this->log_debug('Initializing consent handlers');
-		
-		// Get settings
 		$options = get_option('woocommerce_cc_analytics_settings', array());
 		$sms_enabled = isset($options['enable_sms_consent']) && $options['enable_sms_consent'] !== 'disabled';
 		$email_enabled = isset($options['enable_email_consent']) && $options['enable_email_consent'] !== 'disabled';
 		
-		// Only proceed if at least one consent type is enabled
 		if (!$sms_enabled && !$email_enabled) {
-			$this->log_debug('No consent types enabled, skipping initialization');
 			return;
 		}
 		
-		// Initialize SMS consent if enabled
 		if ($sms_enabled && class_exists('ConvertCart\Analytics\Consent\SMS_Consent')) {
-			$this->log_debug('Initializing SMS consent');
-			$sms_consent = new \ConvertCart\Analytics\Consent\SMS_Consent($this);
+			new \ConvertCart\Analytics\Consent\SMS_Consent($this);
 		}
 		
-		// Initialize Email consent if enabled
 		if ($email_enabled && class_exists('ConvertCart\Analytics\Consent\Email_Consent')) {
-			$this->log_debug('Initializing Email consent');
-			$email_consent = new \ConvertCart\Analytics\Consent\Email_Consent($this);
+			new \ConvertCart\Analytics\Consent\Email_Consent($this);
 		}
-		
-		$this->log_debug('Consent handlers initialized');
 	}
 
 	/**
@@ -1361,18 +1349,35 @@ class WC_CC_Analytics extends \WC_Integration {
 
 	/**
 	 * Debug logging helper specific to this integration class.
-	 * Checks if WP_DEBUG is enabled.
 	 *
 	 * @param string $message Message to log.
 	 */
-	public function log_debug( $message ) {
-		// Check WP_DEBUG constant instead of the setting
-		if ( defined('WP_DEBUG') && WP_DEBUG === true ) {
-			if ( is_array( $message ) || is_object( $message ) ) {
-				$message = print_r( $message, true );
+	public function log_debug($message) {
+		if (defined('WP_DEBUG') && WP_DEBUG === true) {
+			if (is_array($message) || is_object($message)) {
+				$message = print_r($message, true);
 			}
-			// Add a prefix to distinguish these logs
-			error_log( 'Convert Cart Integration Debug: ' . $message );
+			error_log('Convert Cart Integration: ' . $message);
 		}
-    }
+	}
+
+	/**
+	 * Check if WooCommerce version is compatible
+	 */
+	public function check_woocommerce_version() {
+		if (!defined('WC_VERSION')) {
+			return false;
+		}
+		
+		if (version_compare(WC_VERSION, '7.0.0', '<')) {
+			add_action('admin_notices', function() {
+				echo '<div class="notice notice-error"><p>' . 
+					esc_html__('Convert Cart Analytics requires WooCommerce 7.0.0 or higher.', 'woocommerce_cc_analytics') . 
+					'</p></div>';
+			});
+			return false;
+		}
+		
+		return true;
+	}
 }

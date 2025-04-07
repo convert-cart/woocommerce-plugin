@@ -44,34 +44,25 @@ class Admin {
 	 * @param string $hook_suffix The current admin page.
 	 */
 	public function enqueue_admin_scripts( $hook_suffix ) {
-		// Check if we are on one of our settings pages.
-		$screen = get_current_screen();
-		if ( $screen && in_array( $screen->id, array( 'woocommerce_page_convert-cart-sms-consent', 'woocommerce_page_convert-cart-email-consent' ), true ) ) {
-			// Enqueue CodeMirror.
-			$settings = wp_enqueue_code_editor( array( 'type' => 'text/html' ) );
-
-			// Bail if user disabled CodeMirror.
-			if ( false === $settings ) {
-				return;
-			}
-
-			// Enqueue our custom script and pass CodeMirror settings.
-			wp_enqueue_script(
-				'cc-admin-settings',
-				plugin_dir_url( __FILE__ ) . 'assets/js/admin-settings.js', // We'll create this file later
-				array( 'jquery', 'wp-util' ), // wp-util includes underscore.js
-				CC_PLUGIN_VERSION, // Assuming CC_PLUGIN_VERSION is defined
-				true
-			);
-
-			wp_localize_script(
-				'cc-admin-settings',
-				'ccAdminSettings',
-				array(
-					'codeEditorSettings' => $settings,
-				)
-			);
+		if ( 'woocommerce_page_wc-settings' !== $hook_suffix ) {
+			return;
 		}
+		
+		$cm_settings['codeEditor'] = wp_enqueue_code_editor( array( 'type' => 'text/html' ) );
+		wp_localize_script( 'jquery', 'ccAdminSettings', array(
+			'codeEditorSettings' => $cm_settings,
+		) );
+		
+		wp_enqueue_script( 'wp-theme-plugin-editor' );
+		wp_enqueue_style( 'wp-codemirror' );
+		
+		wp_enqueue_script(
+			'cc-admin-settings',
+			plugin_dir_url( __FILE__ ) . 'assets/js/admin-settings.js',
+			array( 'jquery', 'wp-theme-plugin-editor' ),
+			defined( 'CC_PLUGIN_VERSION' ) ? CC_PLUGIN_VERSION : '1.0.0',
+			true
+		);
 	}
 
 	/**
@@ -226,5 +217,8 @@ class Admin {
 		// Use extract to make variables available directly in the view, or pass $view_data array.
 		extract( $view_data, EXTR_SKIP );
 		include_once plugin_dir_path( __FILE__ ) . 'views/settings-page.php'; // Include the new generic view
+
+		// Add this to your admin settings form output
+		wp_nonce_field('cc_consent_settings_nonce', 'cc_consent_nonce');
 	}
 }

@@ -20,16 +20,14 @@ class Email_Consent extends Base_Consent {
 
 	/**
 	 * Constructor
+	 *
+	 * @param Integration $integration The integration instance.
 	 */
 	public function __construct($integration) {
-		// Set consent type and properties BEFORE calling parent constructor
 		$this->consent_type = 'email';
 		$this->set_consent_properties();
-		
-		// Now call parent constructor which will validate properties
 		parent::__construct($integration);
 		
-		// Setup hooks after successful initialization
 		if ($this->is_enabled()) {
 			$this->setup_hooks();
 		}
@@ -39,12 +37,18 @@ class Email_Consent extends Base_Consent {
 	 * Set Email-specific properties.
 	 */
 	protected function set_consent_properties() {
-		// Don't set consent_type here anymore, it's set in constructor
 		$this->enable_setting_key           = 'enable_email_consent';
 		$this->meta_key                     = 'email_consent';
 		$this->checkout_html_option_key     = 'cc_email_consent_checkout_html';
 		$this->registration_html_option_key = 'cc_email_consent_registration_html';
 		$this->account_html_option_key      = 'cc_email_consent_account_html';
+	}
+
+	/**
+	 * Setup Email-specific hooks.
+	 */
+	protected function setup_child_hooks() {
+		add_action('woocommerce_created_customer', array($this, 'update_consent_from_previous_orders'), 20);
 	}
 
 	/**
@@ -90,16 +94,6 @@ class Email_Consent extends Base_Consent {
 	}
 
 	/**
-	 * Setup hooks - This method is now primarily for *Email-specific* hooks.
-	 * The base class handles common checkout, registration, and account hooks.
-	 */
-	protected function setup_child_hooks() {
-		parent::setup_child_hooks(); // Good practice to call parent
-		$this->log_debug('Running setup_child_hooks for Email.');
-		// Add any Email-specific hooks here if needed in the future.
-	}
-
-	/**
 	 * Update consent from previous guest orders when a customer account is created.
 	 *
 	 * @param int $customer_id The newly created customer ID.
@@ -110,7 +104,7 @@ class Email_Consent extends Base_Consent {
 		}
 
 		$user = get_user_by('id', $customer_id);
-		if (!$user) {
+		if (!$user || !$user->user_email) {
 			return;
 		}
 
@@ -120,15 +114,14 @@ class Email_Consent extends Base_Consent {
 			return;
 		}
 
-		// Get guest orders associated with the user's email
-		$order_query = new \Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableQuery(array(
+		// HPOS compatible order query
+		$orders = wc_get_orders(array(
 			'billing_email' => $user->user_email,
-			'limit'        => -1,
-			'type'         => 'shop_order',
-			'customer_id'  => 0,
-			'status'       => array_keys(wc_get_order_statuses()),
+			'limit'         => -1,
+			'type'          => 'shop_order',
+			'customer_id'   => 0,
+			'status'        => array_keys(wc_get_order_statuses()),
 		));
-		$orders = $order_query->get_orders();
 
 		if (empty($orders)) {
 			return;
@@ -136,7 +129,7 @@ class Email_Consent extends Base_Consent {
 
 		// Check orders chronologically
 		foreach ($orders as $order) {
-			$order_consent = $order instanceof \WC_Order ? $order->get_meta($this->meta_key, true) : '';
+			$order_consent = $order->get_meta($this->meta_key, true);
 			if (!empty($order_consent)) {
 				update_user_meta($customer_id, $this->meta_key, $order_consent);
 				break;
