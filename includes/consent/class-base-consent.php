@@ -214,6 +214,51 @@ abstract class Base_Consent {
 	}
 
 	/**
+	 * Get consent HTML for a specific location (checkout, registration, account)
+	 * 
+	 * @param string $location The location (checkout, registration, account)
+	 * @return string The HTML for the consent checkbox
+	 */
+	protected function get_consent_html($location) {
+		$this->log_debug("Getting consent HTML for $location");
+		
+		// Get the option key for this location
+		$option_key = $this->{$location . '_html_option_key'};
+		if (empty($option_key)) {
+			$this->log_debug("Invalid location: $location");
+			return '';
+		}
+		
+		// Get the default HTML method name
+		$default_method = "get_default_{$location}_html";
+		if (!method_exists($this, $default_method)) {
+			$this->log_debug("Default method not found: $default_method");
+			return '';
+		}
+		
+		// Get the HTML from option or use default
+		$default_html = $this->$default_method();
+		$html = get_option($option_key, $default_html);
+		
+		// Check if user is logged in for account/checkout pages
+		if (is_user_logged_in() && ($location === 'account' || $location === 'checkout')) {
+			$user_id = get_current_user_id();
+			$consent_value = get_user_meta($user_id, $this->meta_key, true);
+			
+			if ($consent_value === 'yes') {
+				$html = str_replace(
+					'type="checkbox"',
+					'type="checkbox" checked="checked"',
+					$html
+				);
+			}
+		}
+		
+		$this->log_debug("Returning HTML for $location: " . substr($html, 0, 50) . "...");
+		return $html;
+	}
+
+	/**
 	 * Get the default HTML for the checkout page.
 	 * Abstract method, must be implemented by child classes.
 	 *
@@ -241,7 +286,12 @@ abstract class Base_Consent {
 	 * Setup all necessary hooks
 	 */
 	public function setup_hooks() {
-		$this->log_debug('Setting up hooks');
+		if (!$this->is_enabled()) {
+			$this->log_debug('Consent not enabled, skipping hook setup');
+			return;
+		}
+		
+		$this->log_debug('Setting up hooks for ' . $this->consent_type . ' consent');
 		
 		// Setup common hooks (registration, account, etc.)
 		$this->setup_common_hooks();
@@ -258,14 +308,12 @@ abstract class Base_Consent {
 				$this->log_debug('Classic checkout detected. Setting up classic checkout hooks.');
 				$this->setup_classic_checkout_hooks();
 			}
-			
-			$this->log_debug('Checkout-specific hooks setup complete.');
 		}
 		
 		// Allow child classes to add their own hooks
 		$this->setup_child_hooks();
 		
-		$this->log_debug('All hooks setup complete.');
+		$this->log_debug('All hooks setup complete for ' . $this->consent_type . ' consent.');
 	}
 
 	/**
@@ -275,14 +323,14 @@ abstract class Base_Consent {
 		$this->log_debug('Setting up common hooks (Registration, Account, Order Save).');
 		
 		// Registration form hook
-		add_action('woocommerce_register_form', array($this, 'add_consent_to_registration'));
+		add_action('woocommerce_register_form', array($this, 'add_consent_to_registration'), 15);
 		
 		// My Account edit account form hook
-		add_action('woocommerce_edit_account_form', array($this, 'add_consent_to_account'));
+		add_action('woocommerce_edit_account_form', array($this, 'add_consent_to_account'), 15);
 		
 		// Save consent from registration/account forms
-		add_action('woocommerce_created_customer', array($this, 'save_consent_from_registration'));
-		add_action('woocommerce_save_account_details', array($this, 'save_consent_from_account'));
+		add_action('woocommerce_created_customer', array($this, 'save_consent_from_registration'), 10);
+		add_action('woocommerce_save_account_details', array($this, 'save_consent_from_account'), 10);
 		
 		$this->log_debug('Common hooks setup complete.');
 	}
@@ -305,18 +353,36 @@ abstract class Base_Consent {
 	 * Save consent from registration form
 	 */
 	public function save_consent_from_registration($customer_id) {
-		$consent_field = $this->consent_type . '_consent';
-		$consent_value = isset($_POST[$consent_field]) ? 'yes' : 'no';
-		update_user_meta($customer_id, '_' . $consent_field, $consent_value);
+		$this->log_debug("Saving consent from registration for customer $customer_id");
+		
+		if (!$this->is_enabled()) {
+			$this->log_debug("Consent not enabled, skipping save");
+			return;
+		}
+		
+		$consent_value = isset($_POST[$this->meta_key]) ? 'yes' : 'no';
+		update_user_meta($customer_id, $this->meta_key, $consent_value);
+		update_user_meta($customer_id, $this->meta_key . '_updated', current_time('mysql'));
+		
+		$this->log_debug("Saved $this->consent_type consent as $consent_value");
 	}
 
 	/**
 	 * Save consent from account form
 	 */
 	public function save_consent_from_account($customer_id) {
-		$consent_field = $this->consent_type . '_consent';
-		$consent_value = isset($_POST[$consent_field]) ? 'yes' : 'no';
-		update_user_meta($customer_id, '_' . $consent_field, $consent_value);
+		$this->log_debug("Saving consent from account for customer $customer_id");
+		
+		if (!$this->is_enabled()) {
+			$this->log_debug("Consent not enabled, skipping save");
+			return;
+		}
+		
+		$consent_value = isset($_POST[$this->meta_key]) ? 'yes' : 'no';
+		update_user_meta($customer_id, $this->meta_key, $consent_value);
+		update_user_meta($customer_id, $this->meta_key . '_updated', current_time('mysql'));
+		
+		$this->log_debug("Saved $this->consent_type consent as $consent_value");
 	}
 
 	/**
@@ -501,11 +567,10 @@ abstract class Base_Consent {
 		$this->log_debug('Setting up classic checkout hooks');
 		
 		// Add the consent checkbox to the checkout form
-		add_action('woocommerce_after_checkout_billing_form', array($this, 'add_consent_to_checkout'));
-		// Or maybe: add_action('woocommerce_review_order_before_submit', array($this, 'add_consent_to_checkout'));
+		add_action('woocommerce_after_checkout_billing_form', array($this, 'add_consent_to_checkout'), 15);
 		
 		// Save the consent value when order is placed
-		add_action('woocommerce_checkout_update_order_meta', array($this, 'save_consent_from_checkout'));
+		add_action('woocommerce_checkout_update_order_meta', array($this, 'save_consent_from_checkout'), 10);
 		
 		$this->log_debug('Classic checkout hooks setup complete.');
 	}
@@ -521,11 +586,25 @@ abstract class Base_Consent {
 	 * Save consent from checkout
 	 */
 	public function save_consent_from_checkout($order_id) {
-		$consent_field = $this->consent_type . '_consent';
-		if (isset($_POST[$consent_field])) {
-			update_post_meta($order_id, '_' . $consent_field, 'yes');
-		} else {
-			update_post_meta($order_id, '_' . $consent_field, 'no');
+		$this->log_debug("Saving consent from checkout for order $order_id");
+		
+		if (!$this->is_enabled()) {
+			$this->log_debug("Consent not enabled, skipping save");
+			return;
 		}
+		
+		$consent_value = isset($_POST[$this->meta_key]) ? 'yes' : 'no';
+		
+		// Save to order meta
+		update_post_meta($order_id, '_' . $this->meta_key, $consent_value);
+		
+		// If user is logged in, also save to user meta
+		if (is_user_logged_in()) {
+			$user_id = get_current_user_id();
+			update_user_meta($user_id, $this->meta_key, $consent_value);
+			update_user_meta($user_id, $this->meta_key . '_updated', current_time('mysql'));
+		}
+		
+		$this->log_debug("Saved $this->consent_type consent as $consent_value for order $order_id");
 	}
 } 

@@ -29,10 +29,9 @@ class Email_Consent extends Base_Consent {
 		// Now call parent constructor which will validate properties
 		parent::__construct($integration);
 		
-		// Add hooks after successful initialization
+		// Setup hooks after successful initialization
 		if ($this->is_enabled()) {
-			// Hook for updating consent from previous orders - runs after registration save
-			add_action('woocommerce_created_customer', array($this, 'update_consent_from_previous_orders'), 20, 1);
+			$this->setup_hooks();
 		}
 	}
 

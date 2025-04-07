@@ -167,90 +167,32 @@ class WC_CC_Analytics extends \WC_Integration {
 	 * Runs on template_redirect.
 	 */
 	public function initialize_consent_handlers() {
-		// Add log right at the start
-		error_log('Convert Cart: ENTERING initialize_consent_handlers [Hook: ' . current_filter() . ']');
-		$this->log_debug('Initializing consent handlers on template_redirect.');
-
-		// Check if WooCommerce is available and we are on a relevant page
-		if (!function_exists('is_checkout') || !function_exists('is_account_page')) {
-			$this->log_debug('Exiting consent init: Required WC functions not found.');
-			error_log('Convert Cart: EXITING initialize_consent_handlers (WC functions missing)');
+		$this->log_debug('Initializing consent handlers');
+		
+		// Get settings
+		$options = get_option('woocommerce_cc_analytics_settings', array());
+		$sms_enabled = isset($options['enable_sms_consent']) && $options['enable_sms_consent'] !== 'disabled';
+		$email_enabled = isset($options['enable_email_consent']) && $options['enable_email_consent'] !== 'disabled';
+		
+		// Only proceed if at least one consent type is enabled
+		if (!$sms_enabled && !$email_enabled) {
+			$this->log_debug('No consent types enabled, skipping initialization');
 			return;
 		}
-
-		// Only initialize on checkout page for now
-		if (!is_checkout()) {
-			$this->log_debug('Exiting consent init: Not on checkout page.');
-			error_log('Convert Cart: EXITING initialize_consent_handlers (Not checkout page)');
-			return;
+		
+		// Initialize SMS consent if enabled
+		if ($sms_enabled && class_exists('ConvertCart\Analytics\Consent\SMS_Consent')) {
+			$this->log_debug('Initializing SMS consent');
+			$sms_consent = new \ConvertCart\Analytics\Consent\SMS_Consent($this);
 		}
-		error_log('Convert Cart: initialize_consent_handlers - Passed page check (is_checkout).');
-
-		// Reset handlers array for this request
-		$this->consent_handlers = [];
-		$block_checkout_detected = false; // Flag to check if we need the block filter
-
-		// Instantiate SMS Consent if enabled
-		if (class_exists('ConvertCart\Analytics\Consent\SMS_Consent') && $this->enable_sms_consent !== 'disabled') {
-			$this->log_debug('Instantiating SMS Consent handler.');
-			error_log('Convert Cart: Instantiating SMS Consent handler.');
-			$sms_consent = new Consent\SMS_Consent($this);
-			if ($sms_consent->is_enabled()) {
-				$this->log_debug('SMS Consent is enabled, setting up hooks.');
-				error_log('Convert Cart: Calling SMS setup_hooks.');
-				$sms_consent->setup_hooks(); // setup_hooks will determine if it's block or classic
-				$this->consent_handlers['sms'] = $sms_consent;
-				// Check if block checkout was detected by this handler
-				if ($sms_consent->is_block_checkout()) {
-					$block_checkout_detected = true;
-				}
-			} else {
-				$this->log_debug('SMS Consent instantiated but not enabled (draft mode?).');
-				error_log('Convert Cart: SMS Consent instantiated but not enabled.');
-			}
-		} else {
-			$this->log_debug('SMS Consent class not found or setting is disabled.');
-			error_log('Convert Cart: SMS Consent class/setting check failed.');
+		
+		// Initialize Email consent if enabled
+		if ($email_enabled && class_exists('ConvertCart\Analytics\Consent\Email_Consent')) {
+			$this->log_debug('Initializing Email consent');
+			$email_consent = new \ConvertCart\Analytics\Consent\Email_Consent($this);
 		}
-
-		// Instantiate Email Consent if enabled
-		if (class_exists('ConvertCart\Analytics\Consent\Email_Consent') && $this->enable_email_consent !== 'disabled') {
-			$this->log_debug('Instantiating Email Consent handler.');
-			error_log('Convert Cart: Instantiating Email Consent handler.');
-			$email_consent = new Consent\Email_Consent($this);
-			if ($email_consent->is_enabled()) {
-				$this->log_debug('Email Consent is enabled, setting up hooks.');
-				error_log('Convert Cart: Calling Email setup_hooks.');
-				$email_consent->setup_hooks(); // setup_hooks will determine if it's block or classic
-				$this->consent_handlers['email'] = $email_consent;
-				// Check if block checkout was detected by this handler
-				if ($email_consent->is_block_checkout()) {
-					$block_checkout_detected = true;
-				}
-			} else {
-				$this->log_debug('Email Consent instantiated but not enabled (draft mode?).');
-				error_log('Convert Cart: Email Consent instantiated but not enabled.');
-			}
-		} else {
-			$this->log_debug('Email Consent class not found or setting is disabled.');
-			error_log('Convert Cart: Email Consent class/setting check failed.');
-		}
-
-		// --- ADD THE BLOCK DATA FILTER HERE (ONLY ONCE) ---
-		// Check if block checkout was detected by *any* handler and the filter hasn't been added yet
-		if ($block_checkout_detected && !$this->block_data_filter_added) {
-			$this->log_debug('Block checkout detected, adding the woocommerce_blocks_checkout_render_block_data filter.');
-			error_log('Convert Cart: Adding woocommerce_blocks_checkout_render_block_data filter.');
-			add_filter('woocommerce_blocks_checkout_render_block_data', array($this, 'add_all_consent_to_block_checkout_data'), 10, 1);
-			$this->block_data_filter_added = true; // Set flag
-		} elseif ($block_checkout_detected && $this->block_data_filter_added) {
-			$this->log_debug('Block checkout detected, but filter already added for this request.');
-			error_log('Convert Cart: Block data filter already added.');
-		}
-
-
-		$this->log_debug('Consent handlers initialization complete.');
-		error_log('Convert Cart: FINISHED initialize_consent_handlers.');
+		
+		$this->log_debug('Consent handlers initialized');
 	}
 
 	/**
