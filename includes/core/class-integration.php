@@ -45,6 +45,18 @@ class Integration extends \WC_Integration {
 		// Define user set variables.
 		$this->cc_client_id = $this->get_option( 'cc_client_id' );
 
+		// Check for required PHP extensions
+		if (!class_exists('DOMDocument')) {
+			add_action('admin_notices', function() {
+				?>
+				<div class="notice notice-error">
+					<p><?php _e('Convert Cart Analytics requires the PHP DOMDocument extension. Please contact your hosting provider.', 'woocommerce_cc_analytics'); ?></p>
+				</div>
+				<?php
+			});
+			return;
+		}
+
 		// Actions.
 		add_action( 'woocommerce_update_options_integration_' . $this->id, array( $this, 'process_admin_options' ) );
 		add_action( 'admin_menu', array( $this, 'add_menu_items' ), 15 );
@@ -56,6 +68,9 @@ class Integration extends \WC_Integration {
 		// Initialize the plugin components.
 		$this->load_dependencies();
 		$this->init_components();
+
+		// Add cache clearing hook
+		add_action('woocommerce_cc_analytics_clear_cache', array($this, 'clear_consent_caches'));
 	}
 
 	/**
@@ -74,11 +89,27 @@ class Integration extends \WC_Integration {
 	 * Initialize plugin components.
 	 */
 	private function init_components() {
-		$event_manager = new \ConvertCart\Analytics\Events\Event_Manager( $this );
-		$data_handler  = new \ConvertCart\Analytics\Events\Data_Handler( $this );
-		$sms_consent   = new \ConvertCart\Analytics\Consent\SMS_Consent( $this );
-		$email_consent = new \ConvertCart\Analytics\Consent\Email_Consent( $this );
-		$admin         = new \ConvertCart\Analytics\Admin\Admin( $this );
+		static $initialized = false;
+		
+		if ($initialized) {
+			return;
+		}
+		
+		$event_manager = new \ConvertCart\Analytics\Events\Event_Manager($this);
+		$data_handler = new \ConvertCart\Analytics\Events\Data_Handler($this);
+		
+		// Initialize consent handlers only if WooCommerce is active
+		if (class_exists('WC_Integration')) {
+			// Initialize SMS consent first
+			$sms_consent = new \ConvertCart\Analytics\Consent\SMS_Consent($this);
+			
+			// Then initialize Email consent
+			$email_consent = new \ConvertCart\Analytics\Consent\Email_Consent($this);
+		}
+		
+		$admin = new \ConvertCart\Analytics\Admin\Admin($this);
+		
+		$initialized = true;
 	}
 
 	/**
@@ -536,6 +567,35 @@ class Integration extends \WC_Integration {
 			#adminmenu .toplevel_page_convert-cart .wp-menu-image:before {
 				content: none;
 			}
+			
+			/* Consent checkbox styles */
+			.sms-consent-checkbox,
+			.email-consent-checkbox {
+				margin: 10px 0;
+				clear: both;
+				display: block;
+			}
+			
+			.sms-consent-checkbox input[type="checkbox"],
+			.email-consent-checkbox input[type="checkbox"] {
+				display: inline-block !important;
+				margin-right: 5px;
+				vertical-align: middle;
+			}
+			
+			.sms-consent-checkbox label,
+			.email-consent-checkbox label {
+				display: inline-block;
+				vertical-align: middle;
+				width: auto;
+				margin: 0;
+			}
+			
+			.sms-consent-checkbox span,
+			.email-consent-checkbox span {
+				vertical-align: middle;
+				display: inline;
+			}
 		</style>
 		<?php
 	}
@@ -704,34 +764,34 @@ class Integration extends \WC_Integration {
 			array(
 				'group'    => 'cc_consent_settings',
 				'name'     => 'cc_sms_consent_checkout_html',
-				'sanitize' => 'wp_kses_post'
+				'sanitize' => array($this, 'sanitize_consent_html')
 			),
 			array(
 				'group'    => 'cc_consent_settings',
 				'name'     => 'cc_sms_consent_registration_html',
-				'sanitize' => 'wp_kses_post'
+				'sanitize' => array($this, 'sanitize_consent_html')
 			),
 			array(
 				'group'    => 'cc_consent_settings',
 				'name'     => 'cc_sms_consent_account_html',
-				'sanitize' => 'wp_kses_post'
+				'sanitize' => array($this, 'sanitize_consent_html')
 			),
 			
 			// Email Consent Settings
 			array(
 				'group'    => 'cc_consent_settings',
 				'name'     => 'cc_email_consent_checkout_html',
-				'sanitize' => 'wp_kses_post'
+				'sanitize' => array($this, 'sanitize_consent_html')
 			),
 			array(
 				'group'    => 'cc_consent_settings',
 				'name'     => 'cc_email_consent_registration_html',
-				'sanitize' => 'wp_kses_post'
+				'sanitize' => array($this, 'sanitize_consent_html')
 			),
 			array(
 				'group'    => 'cc_consent_settings',
 				'name'     => 'cc_email_consent_account_html',
-				'sanitize' => 'wp_kses_post'
+				'sanitize' => array($this, 'sanitize_consent_html')
 			)
 		);
 
@@ -746,6 +806,99 @@ class Integration extends \WC_Integration {
 					'show_in_rest'      => false,
 				)
 			);
+		}
+	}
+
+	/**
+	 * Sanitize consent HTML and ensure checkbox exists
+	 */
+	public function sanitize_consent_html($html) {
+		if (empty($html)) {
+			return $html;
+		}
+		
+		// Suppress warnings from loadHTML
+		libxml_use_internal_errors(true);
+		
+		try {
+			$dom = new \DOMDocument();
+			// Use UTF-8 encoding and handle special characters
+			$html = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
+			$dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+			
+			// Clear any XML errors
+			libxml_clear_errors();
+			
+			$is_sms = strpos($html, 'sms_consent') !== false;
+			$input_name = $is_sms ? 'sms_consent' : 'email_consent';
+			
+			$xpath = new \DOMXPath($dom);
+			$checkbox = $xpath->query("//input[@type='checkbox' and @name='$input_name' and @id='$input_name']")->item(0);
+			
+			if (!$checkbox) {
+				return $is_sms ? $this->get_default_sms_consent_html() : $this->get_default_email_consent_html();
+			}
+			
+			return $html;
+		} catch (\Exception $e) {
+			error_log('Convert Cart Analytics: Error sanitizing consent HTML - ' . $e->getMessage());
+			return $is_sms ? $this->get_default_sms_consent_html() : $this->get_default_email_consent_html();
+		} finally {
+			libxml_use_internal_errors(false);
+		}
+	}
+
+	/**
+	 * Clear all relevant caches
+	 */
+	public function clear_consent_caches() {
+		static $cleared = false;
+		
+		// Prevent multiple cache clears in the same request
+		if ($cleared) {
+			return;
+		}
+		
+		try {
+			// Clear specific option caches first (more targeted)
+			$option_keys = array(
+				'cc_sms_consent_checkout_html',
+				'cc_sms_consent_registration_html',
+				'cc_sms_consent_account_html',
+				'cc_email_consent_checkout_html',
+				'cc_email_consent_registration_html',
+				'cc_email_consent_account_html'
+			);
+			
+			foreach ($option_keys as $key) {
+				wp_cache_delete($key, 'options');
+			}
+			
+			// Clear WooCommerce caches only if needed
+			if (function_exists('wc_delete_product_transients')) {
+				wc_delete_product_transients();
+				wc_delete_shop_order_transients();
+			}
+			
+			// Only flush WordPress cache if absolutely necessary
+			// wp_cache_flush(); // Commented out as it's too aggressive
+			
+			$cleared = true;
+			
+		} catch (\Exception $e) {
+			error_log('Convert Cart Analytics: Error clearing caches - ' . $e->getMessage());
+		}
+	}
+
+	/**
+	 * Rate-limited cache clearing
+	 */
+	public function maybe_clear_consent_caches() {
+		$last_clear = get_transient('cc_analytics_cache_last_clear');
+		
+		if (!$last_clear || (time() - $last_clear) > 300) { // 5 minutes
+			$this->clear_consent_caches();
+			set_transient('cc_analytics_cache_last_clear', time(), 300);
 		}
 	}
 }

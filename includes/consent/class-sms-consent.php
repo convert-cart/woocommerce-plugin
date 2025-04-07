@@ -45,11 +45,12 @@ class SMS_Consent extends Base_Consent {
 	 * @return string
 	 */
 	protected function get_default_checkout_html() {
-		return sprintf(
-			'<div class="%1$s-consent-checkbox"><label for="%1$s_consent"><input type="checkbox" name="%1$s_consent" id="%1$s_consent"> %2$s</label></div>',
-			esc_attr( $this->consent_type ),
-			esc_html__( 'I consent to receive SMS communications.', 'woocommerce_cc_analytics' )
-		);
+		return '<div class="sms-consent-checkbox">
+			<label for="sms_consent">
+				<input type="checkbox" name="sms_consent" id="sms_consent" />
+				<span>' . esc_html__( 'I consent to receive SMS communications.', 'woocommerce_cc_analytics' ) . '</span>
+			</label>
+		</div>';
 	}
 
 	/**
@@ -58,11 +59,12 @@ class SMS_Consent extends Base_Consent {
 	 * @return string
 	 */
 	protected function get_default_registration_html() {
-		return sprintf(
-			'<p class="form-row form-row-wide"><label for="%1$s_consent">%2$s</label><input type="checkbox" name="%1$s_consent" id="%1$s_consent"></p>',
-			esc_attr( $this->consent_type ),
-			esc_html__( 'I consent to receive SMS communications', 'woocommerce_cc_analytics' )
-		);
+		return '<div class="sms-consent-checkbox">
+			<label for="sms_consent">
+				<input type="checkbox" name="sms_consent" id="sms_consent" />
+				<span>' . esc_html__( 'I consent to receive SMS communications', 'woocommerce_cc_analytics' ) . '</span>
+			</label>
+		</div>';
 	}
 
 	/**
@@ -71,8 +73,12 @@ class SMS_Consent extends Base_Consent {
 	 * @return string
 	 */
 	protected function get_default_account_html() {
-		// Same as registration for SMS.
-		return $this->get_default_registration_html();
+		return '<div class="sms-consent-checkbox">
+			<label for="sms_consent">
+				<input type="checkbox" name="sms_consent" id="sms_consent" />
+				<span>' . esc_html__( 'I consent to receive SMS communications My Account.', 'woocommerce_cc_analytics' ) . '</span>
+			</label>
+		</div>';
 	}
 
 	/**
@@ -121,5 +127,10 @@ class SMS_Consent extends Base_Consent {
 				break;
 			}
 		}
+	}
+
+	public function __construct(Integration $integration) {
+		$this->consent_type = 'sms'; // Set this before parent constructor
+		parent::__construct($integration);
 	}
 }

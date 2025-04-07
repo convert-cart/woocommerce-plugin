@@ -178,6 +178,30 @@ class WC_CC_Analytics extends \WC_Integration {
 		add_action( 'woocommerce_created_customer', array( $this, 'update_consent_from_previous_orders_email' ), 20, 3 );
 		add_action( 'admin_menu', array( $this, 'add_convert_cart_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_codemirror_assets' ) );
+
+		if (defined('WP_CLI') && WP_CLI) {
+			WP_CLI::add_command('cc-consent', function($args, $assoc_args) {
+				$user_id = $assoc_args['user'] ?? get_current_user_id();
+				
+				// Check SMS consent
+				$sms_consent = get_user_meta($user_id, 'sms_consent', true);
+				WP_CLI::line(sprintf('SMS Consent for user %d: %s', $user_id, $sms_consent ?: 'not set'));
+				
+				// Check Email consent
+				$email_consent = get_user_meta($user_id, 'email_consent', true);
+				WP_CLI::line(sprintf('Email Consent for user %d: %s', $user_id, $email_consent ?: 'not set'));
+			}, array(
+				'shortdesc' => 'Check consent status for a user',
+				'synopsis' => array(
+					array(
+						'type'        => 'assoc',
+						'name'        => 'user',
+						'description' => 'User ID to check',
+						'optional'    => true,
+					),
+				),
+			));
+		}
 	}
 
 	/**
