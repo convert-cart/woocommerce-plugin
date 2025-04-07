@@ -99,27 +99,25 @@ class SMS_Consent extends Base_Consent {
 		}
 
 		// Get guest orders associated with the user's email.
-		$orders = wc_get_orders(
-			array(
-				'billing_email' => $user->user_email,
-				'limit'         => -1, // Check all previous orders.
-				'type'          => 'shop_order',
-				'customer_id'   => 0, // Ensure they were guest orders.
-				'status'        => array_keys( wc_get_order_statuses() ), // Check all statuses.
-			)
-		);
+		$order_query = new \Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableQuery(array(
+			'billing_email' => $user->user_email,
+			'limit'         => -1,
+			'type'          => 'shop_order',
+			'customer_id'   => 0,
+			'status'        => array_keys(wc_get_order_statuses()),
+		));
+		$orders = $order_query->get_orders();
 
 		if ( empty( $orders ) ) {
 			return;
 		}
 
-		// Check orders chronologically (newest first by default with wc_get_orders).
+		// Check orders chronologically (newest first by default)
 		foreach ( $orders as $order ) {
-			$order_consent = $order->get_meta( $this->meta_key, true );
+			$order_consent = $order instanceof \WC_Order ? $order->get_meta($this->meta_key, true) : '';
 			if ( ! empty( $order_consent ) ) {
 				// Found consent info on a previous guest order. Update user meta.
 				update_user_meta( $customer_id, $this->meta_key, $order_consent );
-				// Found the most recent guest order with consent info, stop checking.
 				break;
 			}
 		}

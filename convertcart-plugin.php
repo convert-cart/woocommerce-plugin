@@ -90,11 +90,15 @@ function handle_plugin_activation() {
 	check_ajax_referer('activate-plugin_' . plugin_basename(__FILE__));
 
 	if (!activation_check()) {
-		wp_send_json_error(array(
-			'message' => sprintf(
-				__('Convert Cart Analytics requires WooCommerce to be installed and active. Please install and activate %s first, try activating this plugin after that.', 'woocommerce_cc_analytics'),
+		$message = '';
+		if (!is_woocommerce_active()) {
+			$message = sprintf(
+				__('Convert Cart Analytics requires WooCommerce to be installed and active. Please install and activate %s before activating Convert Cart Analytics, try activating this plugin after that.', 'woocommerce_cc_analytics'),
 				'<a href="https://wordpress.org/plugins/woocommerce/" target="_blank">WooCommerce</a>'
-			)
+			);
+		}
+		wp_send_json_error(array(
+			'message' => $message
 		));
 	}
 
@@ -185,12 +189,9 @@ function add_integration( $integrations ) {
 function admin_notice_missing_woocommerce() {
 	if (!is_woocommerce_active()) {
 		$message = sprintf(
-			__('Convert Cart Analytics requires WooCommerce to be installed and active. Please install and activate %s before activating Convert Cart Analytics, try activating this plugin after that..', 'woocommerce_cc_analytics'),
+			__('Convert Cart Analytics requires WooCommerce to be installed and active. Please install and activate %s before activating Convert Cart Analytics, try activating this plugin after that.', 'woocommerce_cc_analytics'),
 			'<a href="https://wordpress.org/plugins/woocommerce/" target="_blank">WooCommerce</a>'
 		);
-
-		// Show message in plugin row
-		$plugin_file = plugin_basename(__FILE__);
 		?>
 		<tr class="plugin-update-tr active">
 			<td colspan="4" class="plugin-update colspanchange">
@@ -200,8 +201,8 @@ function admin_notice_missing_woocommerce() {
 			</td>
 		</tr>
 		<style>
-			.plugins tr[data-plugin='<?php echo esc_attr($plugin_file); ?>'] th,
-			.plugins tr[data-plugin='<?php echo esc_attr($plugin_file); ?>'] td {
+			.plugins tr[data-plugin='<?php echo esc_attr(plugin_basename(__FILE__)); ?>'] th,
+			.plugins tr[data-plugin='<?php echo esc_attr(plugin_basename(__FILE__)); ?>'] td {
 				box-shadow: none;
 			}
 		</style>
@@ -217,3 +218,10 @@ add_action('after_plugin_row_' . plugin_basename(__FILE__), 'ConvertCart\Analyti
 if (is_woocommerce_active()) {
 	add_action('plugins_loaded', 'ConvertCart\Analytics\init');
 }
+
+// Add HPOS compatibility declaration
+add_action('before_woocommerce_init', function() {
+	if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
+		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
+	}
+});
