@@ -342,24 +342,14 @@ class Integration extends \WC_Integration {
 			__( 'Convert Cart', 'woocommerce_cc_analytics' ),
 			'manage_woocommerce',
 			$parent_slug,
-			array( $this, 'render_settings_page' ),
+			'', // No callback needed for parent menu
 			'none'  // We'll use custom CSS for the icon
 		);
 
 		// Add custom menu icon CSS
 		add_action('admin_head', array($this, 'add_menu_icon_styles'));
 
-		// Add Settings submenu
-		add_submenu_page(
-			$parent_slug,
-			__( 'Convert Cart Settings', 'woocommerce_cc_analytics' ),
-			__( 'Domain Settings', 'woocommerce_cc_analytics' ),
-			'manage_woocommerce',
-			$parent_slug,
-			array( $this, 'render_settings_page' )
-		);
-
-		// SMS Consent submenu
+		// Add SMS Consent submenu
 		add_submenu_page(
 			$parent_slug,
 			__( 'SMS Consent', 'woocommerce_cc_analytics' ),
@@ -369,7 +359,7 @@ class Integration extends \WC_Integration {
 			array( $this, 'render_sms_consent_page' )
 		);
 
-		// Email Consent submenu
+		// Add Email Consent submenu
 		add_submenu_page(
 			$parent_slug,
 			__( 'Email Consent', 'woocommerce_cc_analytics' ),
@@ -378,14 +368,19 @@ class Integration extends \WC_Integration {
 			'convert-cart-email-consent',
 			array( $this, 'render_email_consent_page' )
 		);
-	}
 
-	/**
-	 * Render the main settings page
-	 */
-	public function render_settings_page() {
-		wp_safe_redirect( admin_url( 'admin.php?page=wc-settings&tab=integration&section=' . $this->id ) );
-		exit;
+		// Add Settings submenu at the bottom
+		add_submenu_page(
+			$parent_slug,
+			__( 'Convert Cart Settings', 'woocommerce_cc_analytics' ),
+			__( 'Domain Settings', 'woocommerce_cc_analytics' ),
+			'manage_woocommerce',
+			'admin.php?page=wc-settings&tab=integration&section=' . $this->id,
+			''
+		);
+
+		// Remove the default first submenu item that duplicates the parent menu
+		remove_submenu_page($parent_slug, $parent_slug);
 	}
 
 	/**
@@ -511,14 +506,6 @@ class Integration extends \WC_Integration {
 			}
 			#adminmenu .toplevel_page_convert-cart .wp-menu-image:before {
 				content: none;
-			}
-			.code-editor-wrapper {
-				border: 1px solid #ddd;
-				margin-bottom: 20px;
-			}
-			.code-editor-wrapper .CodeMirror {
-				height: auto;
-				min-height: 150px;
 			}
 		</style>
 		<?php
