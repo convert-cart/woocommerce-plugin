@@ -60,28 +60,107 @@ spl_autoload_register(
 );
 
 /**
+ * Check if WooCommerce is active
+ */
+function is_woocommerce_active() {
+	return in_array(
+		'woocommerce/woocommerce.php',
+		apply_filters('active_plugins', get_option('active_plugins'))
+	);
+}
+
+/**
+ * Prevent plugin activation if WooCommerce is not active
+ */
+function activation_check() {
+	if (!is_woocommerce_active()) {
+		return false;
+	}
+	return true;
+}
+
+/**
+ * Handle plugin activation via AJAX
+ */
+function handle_plugin_activation() {
+	if (!current_user_can('activate_plugins')) {
+		wp_die(__('You do not have sufficient permissions to activate plugins.', 'woocommerce_cc_analytics'));
+	}
+
+	check_ajax_referer('activate-plugin_' . plugin_basename(__FILE__));
+
+	if (!activation_check()) {
+		wp_send_json_error(array(
+			'message' => sprintf(
+				__('Convert Cart Analytics requires WooCommerce to be installed and active. Please install and activate %s first, try activating this plugin after that.', 'woocommerce_cc_analytics'),
+				'<a href="https://wordpress.org/plugins/woocommerce/" target="_blank">WooCommerce</a>'
+			)
+		));
+	}
+
+	// If WooCommerce is active, proceed with activation
+	activate_plugin(plugin_basename(__FILE__));
+	wp_send_json_success();
+}
+add_action('wp_ajax_convert_cart_activate_plugin', 'ConvertCart\Analytics\handle_plugin_activation');
+
+/**
+ * Modify plugin action links to handle activation via AJAX
+ */
+function modify_plugin_action_links($actions, $plugin_file) {
+	if (plugin_basename(__FILE__) === $plugin_file && isset($actions['activate'])) {
+		$nonce = wp_create_nonce('activate-plugin_' . $plugin_file);
+		$actions['activate'] = sprintf(
+			'<a href="#" class="button activate-now" data-plugin="%s" data-nonce="%s">%s</a>',
+			esc_attr($plugin_file),
+			esc_attr($nonce),
+			esc_html__('Activate', 'woocommerce_cc_analytics')
+		);
+
+		// Add inline script for handling activation
+		add_action('admin_footer', function() use ($plugin_file) {
+			?>
+			<script>
+			jQuery(document).ready(function($) {
+				$('.activate-now[data-plugin="<?php echo esc_js($plugin_file); ?>"]').on('click', function(e) {
+					e.preventDefault();
+					var $button = $(this);
+
+					$.ajax({
+						url: ajaxurl,
+						type: 'POST',
+						data: {
+							action: 'convert_cart_activate_plugin',
+							_ajax_nonce: $button.data('nonce'),
+						},
+						success: function(response) {
+							if (response.success) {
+								window.location.reload();
+							} else {
+								alert(response.data.message);
+							}
+						}
+					});
+				});
+			});
+			</script>
+			<?php
+		});
+	}
+	return $actions;
+}
+add_filter('plugin_action_links', 'ConvertCart\Analytics\modify_plugin_action_links', 10, 2);
+
+/**
  * Initialize the plugin.
  */
 function init() {
-	// Check if WooCommerce is active
-	if ( ! class_exists( 'WooCommerce' ) ) {
-		add_action( 'admin_notices', function() {
-			?>
-			<div class="error">
-				<p><?php esc_html_e( 'Convert Cart Analytics requires WooCommerce to be installed and active.', 'woocommerce_cc_analytics' ); ?></p>
-			</div>
-			<?php
-		});
-		return;
-	}
-
 	// Now it's safe to include and use WooCommerce classes
 	require_once dirname( __FILE__ ) . '/includes/core/class-integration.php';
 
 	// Add the integration to WooCommerce.
 	add_filter( 'woocommerce_integrations', 'ConvertCart\Analytics\add_integration', 10 );
 }
-add_action( 'plugins_loaded', 'ConvertCart\Analytics\init' );
 
 /**
  * Add the integration to WooCommerce.
@@ -98,4 +177,43 @@ function add_integration( $integrations ) {
 	$integrations[] = 'ConvertCart\Analytics\Core\Integration';
 
 	return $integrations;
+}
+
+/**
+ * Add a more informative admin notice if WooCommerce gets deactivated while our plugin is active
+ */
+function admin_notice_missing_woocommerce() {
+	if (!is_woocommerce_active()) {
+		$message = sprintf(
+			__('Convert Cart Analytics requires WooCommerce to be installed and active. Please install and activate %s before activating Convert Cart Analytics, try activating this plugin after that..', 'woocommerce_cc_analytics'),
+			'<a href="https://wordpress.org/plugins/woocommerce/" target="_blank">WooCommerce</a>'
+		);
+
+		// Show message in plugin row
+		$plugin_file = plugin_basename(__FILE__);
+		?>
+		<tr class="plugin-update-tr active">
+			<td colspan="4" class="plugin-update colspanchange">
+				<div class="update-message notice inline notice-error notice-alt">
+					<p><?php echo wp_kses_post($message); ?></p>
+				</div>
+			</td>
+		</tr>
+		<style>
+			.plugins tr[data-plugin='<?php echo esc_attr($plugin_file); ?>'] th,
+			.plugins tr[data-plugin='<?php echo esc_attr($plugin_file); ?>'] td {
+				box-shadow: none;
+			}
+		</style>
+		<?php
+		deactivate_plugins(plugin_basename(__FILE__));
+	}
+}
+
+// Add notice to plugin row
+add_action('after_plugin_row_' . plugin_basename(__FILE__), 'ConvertCart\Analytics\admin_notice_missing_woocommerce', 10, 2);
+
+// Initialize plugin only if WooCommerce is active
+if (is_woocommerce_active()) {
+	add_action('plugins_loaded', 'ConvertCart\Analytics\init');
 }
