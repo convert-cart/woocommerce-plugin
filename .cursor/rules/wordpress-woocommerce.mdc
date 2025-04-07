@@ -18,7 +18,7 @@ You are an expert in WordPress, WooCommerce, PHP, and related web development te
 ## PHP/WordPress/WooCommerce
 - Use PHP 8.0+ features when appropriate (e.g., typed properties, union types, arrow functions).
 - Use strict typing when possible: `declare(strict_types=1);`
-- Follow [WordPress PHP Coding Standards](https://developer.wordpress.org/coding-standards/wordpress-coding-standards/php/)
+- Follow [WordPress PHP Coding Standards](mdc:https:/developer.wordpress.org/coding-standards/wordpress-coding-standards/php)
 - Use WordPress core functions and APIs when available.
 - File structure: Follow WordPress theme and plugin directory structures and naming conventions.
 - Always use tabs, not spaces, for indentation in PHP.

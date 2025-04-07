@@ -106,20 +106,36 @@ abstract class Base_Consent {
 	/**
 	 * Constructor with duplicate prevention
 	 */
-	public function __construct(Integration $integration) {
-		// Set consent type first in child classes
-		if (empty($this->consent_type)) {
-			throw new \Exception('Consent type must be set before calling parent constructor');
+	public function __construct($integration) {
+		// Basic check if $integration looks usable for logging
+		if (!is_object($integration)) {
+			error_log('Convert Cart Base Consent Error: Integration parameter is not an object.');
+			return;
 		}
-		
+
+		// Check if it's one of our expected integration classes
+		if (!($integration instanceof \WC_Integration) && !($integration instanceof \ConvertCart\Analytics\Core\Integration)) {
+			error_log('Convert Cart Base Consent Error: Integration object is not of expected type.');
+			return;
+		}
+
 		$this->integration = $integration;
-		$this->set_consent_properties();
-		$this->validate_properties();
 		
-		// Setup hooks only if enabled
-		if ($this->is_enabled()) {
-		$this->setup_hooks();
+		// Set properties first
+		$this->set_consent_properties();
+		
+		// Then validate them
+		try {
+		$this->validate_properties();
+		} catch (\Exception $e) {
+			error_log('Convert Cart Base Consent Error: ' . $e->getMessage());
+			return;
 		}
+
+		// Verify setup - logs settings
+		$this->verify_setup();
+
+		$this->log_debug('Base_Consent constructor finished.');
 	}
 
 	/**
@@ -128,24 +144,29 @@ abstract class Base_Consent {
 	abstract protected function set_consent_properties();
 
 	/**
-	 * Validates that essential properties are set by the child class.
+	 * Validate required properties are set
 	 *
-	 * @throws \Exception If a required property is not set.
+	 * @throws \Exception If required properties are not set
 	 */
-	private function validate_properties() {
-		$required_properties = array(
+	protected function validate_properties() {
+		$required_properties = [
 			'consent_type',
 			'enable_setting_key',
 			'meta_key',
 			'checkout_html_option_key',
 			'registration_html_option_key',
-			'account_html_option_key',
-		);
-		foreach ( $required_properties as $prop ) {
-			if ( empty( $this->$prop ) ) {
-				throw new \Exception( sprintf( 'Required property "%s" must be set in class %s.', $prop, get_called_class() ) );
+			'account_html_option_key'
+		];
+
+		foreach ($required_properties as $property) {
+			if (empty($this->$property)) {
+				$this->log_debug("Required property \"$property\" is not set.");
+				// Don't throw, just return
+				return;
 			}
 		}
+
+		$this->log_debug('Properties validated successfully.');
 	}
 
 	/**
@@ -158,18 +179,38 @@ abstract class Base_Consent {
 	}
 
 	/**
-	 * Check if this consent type is enabled in settings.
+	 * Check if this consent type is enabled (set to 'live' or 'draft').
+	 * Allows checking for specific states like 'live'.
 	 *
-	 * @return bool
+	 * @param string|null $state Check for a specific state ('live', 'draft'). If null, checks if not 'disabled'.
+	 * @return bool True if enabled (or matches the specified state), false otherwise.
 	 */
-	protected function is_enabled() {
-		$options = get_option($this->settings_option_key);
-		$enabled = isset($options[$this->enable_setting_key]) && 
-				   ($options[$this->enable_setting_key] === 'live' || 
-				    $options[$this->enable_setting_key] === 'draft');
-		
-		$this->log_debug($this->consent_type . ' consent is ' . ($enabled ? 'enabled' : 'disabled'));
-		return $enabled;
+	public function is_enabled( $state = null ) {
+		$settings = get_option( $this->settings_option_key, array() );
+		$current_status = $settings[ $this->enable_setting_key ] ?? 'disabled';
+
+		if ( $state ) {
+			$is_enabled = ( $current_status === $state );
+			$this->log_debug( sprintf(
+				'Checking if %s consent is enabled for state "%s". Key: %s, Value: %s, Result: %s',
+				$this->consent_type,
+				$state,
+				$this->enable_setting_key,
+				$current_status,
+				$is_enabled ? 'true' : 'false'
+			) );
+			return $is_enabled;
+		} else {
+			$is_enabled = ( $current_status !== 'disabled' );
+			$this->log_debug( sprintf(
+				'Checking if %s consent is enabled (not disabled). Key: %s, Value: %s, Result: %s',
+				$this->consent_type,
+				$this->enable_setting_key,
+				$current_status,
+				$is_enabled ? 'true' : 'false'
+			) );
+			return $is_enabled;
+		}
 	}
 
 	/**
@@ -197,331 +238,294 @@ abstract class Base_Consent {
 	abstract protected function get_default_account_html();
 
 	/**
-	 * Setup common hooks.
+	 * Setup all necessary hooks
 	 */
-	protected function setup_hooks() {
-		if (!$this->is_enabled()) {
-			return;
-		}
-
-		// Account page hooks
-		add_action('woocommerce_edit_account_form', array($this, 'add_consent_checkbox_to_account'), 15);
-		add_action('woocommerce_save_account_details', array($this, 'save_consent_from_account'), 10);
-
-		// Registration page hooks - Update these hooks
-		add_action('woocommerce_register_form', array($this, 'add_consent_checkbox_to_registration'), 20);
-		add_action('woocommerce_register_form_start', array($this, 'add_registration_nonce'), 10);
-		add_action('woocommerce_created_customer', array($this, 'save_consent_from_registration'), 10);
-
-		// Checkout page hooks
-		add_action('woocommerce_review_order_before_submit', array($this, 'add_consent_checkbox_to_checkout'), 15);
-		add_action('woocommerce_checkout_update_order_meta', array($this, 'save_consent_from_checkout'), 10);
-		add_action('woocommerce_checkout_create_order', array($this, 'save_consent_to_order'), 10);
-
-		$this->log_debug('Hooks setup complete for ' . $this->consent_type . ' consent');
-	}
-
-	/**
-	 * Add registration nonce field
-	 */
-	public function add_registration_nonce() {
-		wp_nonce_field($this->register_nonce_action, 'woocommerce-register-nonce');
-	}
-
-	/**
-	 * Validates and ensures required checkbox exists in HTML.
-	 */
-	protected function validate_consent_html($html, $input_name) {
-		if (empty($html)) {
-			return $this->get_default_account_html();
-		}
-
-		// Check if checkbox input exists with correct attributes
-		$has_checkbox = strpos($html, '<input type="checkbox"') !== false &&
-					   strpos($html, 'name="' . $input_name . '"') !== false &&
-					   strpos($html, 'id="' . $input_name . '"') !== false;
-
-		if (!$has_checkbox) {
-			// If checkbox is missing, insert it before the span tag
-			if (strpos($html, '<span>') !== false) {
-				$html = str_replace(
-					'<span>',
-					'<input type="checkbox" name="' . $input_name . '" id="' . $input_name . '" /><span>',
-					$html
-				);
-			} else {
-				// If no suitable place to insert, return default
-				return $this->get_default_account_html();
-			}
-		}
-
-		return $html;
-	}
-
-	/**
-	 * Debug logging helper
-	 */
-	protected function log_debug(string $message): void {
-		if (function_exists('wc_get_logger')) {
-			wc_get_logger()->debug(
-				sprintf('Convert Cart %s Consent: %s', ucfirst($this->consent_type), $message),
-				['source' => 'convertcart-analytics']
-			);
-		}
-	}
-
-	/**
-	 * Adds consent checkbox to checkout.
-	 */
-	public function add_consent_checkbox_to_checkout() {
-		if (!$this->is_enabled()) {
-			return;
-		}
-
-		$default_html = $this->get_default_checkout_html();
-		$checkout_html = get_option($this->checkout_html_option_key, $default_html);
-
-		// Force checkbox to exist
-		if (strpos($checkout_html, '<input type="checkbox"') === false) {
-			$checkout_html = $default_html;
-		}
-
-		// Check if user is logged in and has existing consent
-		if (is_user_logged_in()) {
-			$user_id = get_current_user_id();
-			$consent_value = get_user_meta($user_id, $this->meta_key, true);
-			if ($consent_value === 'yes') {
-				$checkout_html = str_replace(
-					'type="checkbox"',
-					'type="checkbox" checked="checked"',
-					$checkout_html
-				);
-			}
-		}
-
-		echo wp_kses($checkout_html, $this->get_allowed_html());
-	}
-
-	/**
-	 * Save consent to order meta
-	 */
-	public function save_consent_to_order($order) {
-		if (!$this->is_enabled()) {
-			return;
-		}
-
-		$consent_value = isset($_POST[$this->meta_key]) ? 'yes' : 'no';
-		$order->update_meta_data($this->meta_key, $consent_value);
-		$order->update_meta_data($this->meta_key . '_updated', current_time('mysql'));
-
-		// If user is creating an account during checkout, store consent in session
-		if (!is_user_logged_in() && isset($_POST['createaccount']) && $_POST['createaccount']) {
-			WC()->session->set('cc_pending_' . $this->meta_key, $consent_value);
-		}
-
-		$this->log_debug(sprintf(
-			'Saved %s consent to order %d: %s',
-			$this->consent_type,
-			$order->get_id(),
-			$consent_value
-		));
-	}
-
-	/**
-	 * Saves consent when an account is created during checkout.
-	 * Uses the value stored in the session by save_consent_from_checkout.
-	 *
-	 * @param int $customer_id The new customer ID.
-	 */
-	public function save_consent_on_account_creation_from_checkout( $customer_id ) {
-		if ( ! $this->is_enabled() ) {
-			return;
-		}
-
-		$session_key = 'cc_pending_' . $this->meta_key;
-		if ( WC()->session && WC()->session->get( $session_key ) ) {
-			$consent_value = WC()->session->get( $session_key );
-			update_user_meta( $customer_id, $this->meta_key, $consent_value );
-			WC()->session->__unset( $session_key ); // Clean up session data.
-		}
-		// If not set in session, it implies either account wasn't created during this checkout,
-		// or consent wasn't given/processed correctly. We avoid setting 'no' here
-		// to prevent overwriting consent possibly set via registration form if hooks fire closely.
-	}
-
-
-	/**
-	 * Adds consent checkbox to the registration form.
-	 */
-	public function add_consent_checkbox_to_registration() {
-		if (!$this->is_enabled()) {
-			$this->log_debug('Registration consent not enabled');
-			return;
-		}
-
-		$this->log_debug('Adding consent checkbox to registration form');
+	public function setup_hooks() {
+		$this->log_debug('Setting up hooks');
 		
-		$default_html = $this->get_default_registration_html();
-		$registration_html = get_option($this->registration_html_option_key, $default_html);
-
-		// Force checkbox to exist
-		if (strpos($registration_html, '<input type="checkbox"') === false) {
-			$registration_html = $default_html;
+		// Setup common hooks (registration, account, etc.)
+		$this->setup_common_hooks();
+		
+		// Setup checkout-specific hooks
+		if (function_exists('is_checkout') && is_checkout()) {
+			$this->log_debug('On checkout page, setting up checkout hooks.');
+			
+			// Check if using block checkout or classic checkout
+			if ($this->is_block_checkout()) {
+				$this->log_debug('Block checkout detected. Setting up block checkout hooks.');
+				$this->setup_block_checkout_hooks();
+			} else {
+				$this->log_debug('Classic checkout detected. Setting up classic checkout hooks.');
+				$this->setup_classic_checkout_hooks();
+			}
+			
+			$this->log_debug('Checkout-specific hooks setup complete.');
 		}
-
-		// Add form-row class for proper styling
-		if (strpos($registration_html, 'form-row') === false) {
-			$registration_html = str_replace('class="', 'class="form-row ', $registration_html);
-		}
-
-		echo wp_kses($registration_html, $this->get_allowed_html());
+		
+		// Allow child classes to add their own hooks
+		$this->setup_child_hooks();
+		
+		$this->log_debug('All hooks setup complete.');
 	}
 
 	/**
-	 * Saves consent from the registration form.
+	 * Setup common hooks for all consent types
+	 */
+	protected function setup_common_hooks() {
+		$this->log_debug('Setting up common hooks (Registration, Account, Order Save).');
+		
+		// Registration form hook
+		add_action('woocommerce_register_form', array($this, 'add_consent_to_registration'));
+		
+		// My Account edit account form hook
+		add_action('woocommerce_edit_account_form', array($this, 'add_consent_to_account'));
+		
+		// Save consent from registration/account forms
+		add_action('woocommerce_created_customer', array($this, 'save_consent_from_registration'));
+		add_action('woocommerce_save_account_details', array($this, 'save_consent_from_account'));
+		
+		$this->log_debug('Common hooks setup complete.');
+	}
+
+	/**
+	 * Add consent checkbox to registration form
+	 */
+	public function add_consent_to_registration() {
+		echo $this->get_consent_html('registration');
+	}
+
+	/**
+	 * Add consent checkbox to My Account edit form
+	 */
+	public function add_consent_to_account() {
+		echo $this->get_consent_html('account');
+	}
+
+	/**
+	 * Save consent from registration form
 	 */
 	public function save_consent_from_registration($customer_id) {
-		if (!$this->is_enabled()) {
-			$this->log_debug('Registration consent not enabled');
-			return;
-		}
-
-		$this->log_debug('Processing registration consent for customer ' . $customer_id);
-
-		// Check if this is a registration form submission
-		if (!isset($_POST['woocommerce-register-nonce']) || 
-			!wp_verify_nonce(
-				sanitize_text_field(wp_unslash($_POST['woocommerce-register-nonce'])), 
-				$this->register_nonce_action
-			)) {
-			$this->log_debug('Invalid or missing registration nonce');
-			return;
-		}
-
-		$consent_value = isset($_POST[$this->meta_key]) ? 'yes' : 'no';
-		update_user_meta($customer_id, $this->meta_key, $consent_value);
-		update_user_meta($customer_id, $this->meta_key . '_updated', current_time('mysql'));
-
-		$this->log_debug(sprintf(
-			'Saved %s consent from registration. Customer: %d, Value: %s',
-			$this->consent_type,
-			$customer_id,
-			$consent_value
-		));
+		$consent_field = $this->consent_type . '_consent';
+		$consent_value = isset($_POST[$consent_field]) ? 'yes' : 'no';
+		update_user_meta($customer_id, '_' . $consent_field, $consent_value);
 	}
 
 	/**
-	 * Get allowed HTML for consent forms
+	 * Save consent from account form
 	 */
-	protected function get_allowed_html() {
-		return array(
-			'div' => array(
-				'class' => array(),
-			),
-			'label' => array(
-				'for' => array(),
-			),
-			'input' => array(
-				'type' => array(),
-				'name' => array(),
-				'id' => array(),
-				'checked' => array(),
-				'class' => array(),
-			),
-			'span' => array(
-				'class' => array(),
-			),
-		);
+	public function save_consent_from_account($customer_id) {
+		$consent_field = $this->consent_type . '_consent';
+		$consent_value = isset($_POST[$consent_field]) ? 'yes' : 'no';
+		update_user_meta($customer_id, '_' . $consent_field, $consent_value);
 	}
 
 	/**
-	 * Adds consent checkbox to the account details page.
+	 * Placeholder for child classes to add specific hooks.
+	 * This method should be overridden in SMS_Consent and Email_Consent if they have unique hooks.
 	 */
-	public function add_consent_checkbox_to_account() {
-		if (!$this->is_enabled()) {
-			$this->log_debug('Consent not enabled');
-			return;
-		}
-		
-		$this->log_debug('Adding consent checkbox to account');
-		$user_id = get_current_user_id();
-		$consent_value = get_user_meta($user_id, $this->meta_key, true);
-
-		$default_html = $this->get_default_account_html();
-		$account_html = get_option($this->account_html_option_key, $default_html);
-		
-		// Force checkbox to exist
-		if (strpos($account_html, '<input type="checkbox"') === false) {
-			$account_html = $default_html;
-		}
-		
-		if ($consent_value === 'yes') {
-			$account_html = str_replace(
-				'type="checkbox"',
-				'type="checkbox" checked="checked"',
-				$account_html
-			);
-		}
-		
-		// Do NOT add nonce field here - it's already added by WooCommerce
-		echo wp_kses($account_html, $this->get_allowed_html());
+	protected function setup_child_hooks() {
+		// Example: add_action('some_sms_specific_hook', [$this, 'sms_handler']);
+		$this->log_debug('Running setup_child_hooks (Base implementation - no hooks added).');
 	}
 
 	/**
-	 * Saves consent from the account details page.
+	 * Verify settings and hooks
+	 */
+	protected function verify_setup() {
+		$options = get_option($this->settings_option_key);
+		$this->log_debug('Current settings: ' . print_r($options, true));
+		$this->log_debug('Enable setting key: ' . $this->enable_setting_key);
+		
+		// Check if hook exists before trying to print it
+		if (isset($GLOBALS['wp_filter']['woocommerce_after_checkout_billing_form'])) {
+			$this->log_debug('Current hooks: ' . print_r($GLOBALS['wp_filter']['woocommerce_after_checkout_billing_form'], true));
+		} else {
+			$this->log_debug('Checkout billing form hook not yet registered');
+		}
+	}
+
+	/**
+	 * Debug logging helper - Uses WP_DEBUG.
+	 */
+	protected function log_debug($message) {
+		// Always use error_log if WP_DEBUG is enabled
+		if ( defined('WP_DEBUG') && WP_DEBUG === true ) {
+			if ( is_array( $message ) || is_object( $message ) ) {
+				$message = print_r( $message, true );
+			}
+			error_log(sprintf(
+				'Convert Cart %s Consent Debug: %s [Hook: %s]', // Simplified prefix
+				ucfirst($this->consent_type ?: 'Unknown'),
+				$message,
+				current_filter() ?: 'N/A'
+			));
+		}
+	}
+
+	/**
+	 * Check if the current checkout page uses blocks.
+	 * Basic check - might need refinement based on theme/setup.
 	 *
-	 * @param int $user_id The user ID being saved.
+	 * @return bool
 	 */
-	public function save_consent_from_account(int $user_id): bool {
-		try {
-			if (!$this->is_enabled()) {
-				return false;
-			}
+	public function is_block_checkout() {
+		$this->log_debug("Running is_block_checkout check...");
 
-			if (!isset($_POST['save-account-details-nonce']) || 
-				!wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['save-account-details-nonce'])), 'save_account_details')) {
-				return false;
-			}
-
-			$raw_consent = isset($_POST[$this->meta_key]) ? 'yes' : 'no';
-			$consent_value = $this->validate_consent_value($raw_consent);
-			
-			update_user_meta($user_id, $this->meta_key, $consent_value);
-			update_user_meta($user_id, $this->meta_key . '_updated', current_time('mysql'));
-			
-			$this->log_debug(sprintf('Updated %s consent for user %d to %s', $this->consent_type, $user_id, $consent_value));
-			return true;
-		} catch (\Exception $e) {
-			$this->log_debug(sprintf('Error saving %s consent: %s', $this->consent_type, $e->getMessage()));
+		if (!function_exists('is_checkout')) {
+			$this->log_debug("is_block_checkout: is_checkout function doesn't exist.");
 			return false;
 		}
-	}
 
-	protected function validate_consent_value($value): string {
-		$valid_values = ['yes', 'no'];
-		return in_array($value, $valid_values, true) ? $value : 'no';
-	}
-
-	protected function get_consent_html(string $type): string {
-		$cache_key = "cc_{$this->consent_type}_{$type}_html_cache";
-		$cached_html = get_transient($cache_key);
-		
-		if (false !== $cached_html) {
-			return $cached_html;
+		if (!is_checkout()) {
+			$this->log_debug("is_block_checkout: Not on checkout page.");
+			return false;
 		}
-		
-		$html = get_option($this->{$type . '_html_option_key'}, $this->{"get_default_{$type}_html"}());
-		set_transient($cache_key, $html, HOUR_IN_SECONDS);
-		
-		return $html;
+
+		$this->log_debug("is_block_checkout: is_checkout() returned true.");
+
+		if (!function_exists('wc_get_page_id')) {
+			$this->log_debug("is_block_checkout: wc_get_page_id function doesn't exist.");
+			return false;
+		}
+
+		$checkout_page_id = wc_get_page_id('checkout');
+		if (!$checkout_page_id || $checkout_page_id <= 0) {
+			$this->log_debug("is_block_checkout: Invalid checkout page ID: " . print_r($checkout_page_id, true));
+			return false;
+		}
+
+		$this->log_debug("is_block_checkout: Got checkout page ID: $checkout_page_id");
+
+		$checkout_page = get_post($checkout_page_id);
+		if (!$checkout_page instanceof \WP_Post) {
+			$this->log_debug("is_block_checkout: Could not get checkout page post object.");
+			return false;
+		}
+
+		$this->log_debug("is_block_checkout: Got checkout page post object.");
+
+		// Check for block checkout in several ways
+		$has_block = has_block('woocommerce/checkout', $checkout_page);
+		$post_content = $checkout_page->post_content;
+		$contains_block_comment = strpos($post_content, '<!-- wp:woocommerce/checkout -->') !== false;
+
+		$this->log_debug(sprintf(
+			"is_block_checkout: has_block: %s, contains_block_comment: %s",
+			$has_block ? 'true' : 'false',
+			$contains_block_comment ? 'true' : 'false'
+		));
+
+		return $has_block || $contains_block_comment;
 	}
 
-	public function get_consent_value($user_id): string {
-		$consent_value = get_user_meta($user_id, $this->meta_key, true);
-		return apply_filters(
-			'convertcart_' . $this->consent_type . '_consent_value',
-			$consent_value,
-			$user_id
+	/**
+	 * Setup block-specific checkout hooks
+	 */
+	protected function setup_block_checkout_hooks() {
+		$this->log_debug('Setting up block checkout hooks');
+
+		// Enqueue the JavaScript needed for the block integration
+		add_action('wp_enqueue_scripts', array($this, 'enqueue_block_checkout_scripts'));
+
+		$this->log_debug('Block checkout hooks setup complete.');
+	}
+
+	/**
+	 * Enqueue scripts specifically for the block checkout integration.
+	 */
+	public function enqueue_block_checkout_scripts() {
+		// Only enqueue on the block checkout page itself
+		if (!$this->is_block_checkout()) {
+			return;
+		}
+
+		$script_path = plugin_dir_path(dirname(__FILE__, 2)) . 'assets/js/block-checkout-integration.js';
+		$script_url = plugin_dir_url(dirname(__FILE__, 2)) . 'assets/js/block-checkout-integration.js';
+		$version = file_exists($script_path) ? filemtime($script_path) : CC_PLUGIN_VERSION;
+
+		if (!file_exists($script_path)) {
+			$this->log_debug('Block checkout script file not found at: ' . $script_path);
+			error_log('Convert Cart Error: Block checkout script file not found: ' . $script_path);
+			return;
+		}
+
+		$script_handle = 'convertcart-block-checkout'; // Define handle
+
+		$this->log_debug('Enqueueing block checkout script: ' . $script_url);
+
+		wp_enqueue_script(
+			$script_handle, // Use handle
+			$script_url,
+			array(
+				'wp-blocks', 'wp-element', 'wp-html-entities', 'wp-i18n',
+				'wp-plugins', 'wp-components', 'wc-blocks-checkout', 'wc-blocks-registry'
+			),
+			$version,
+			true
 		);
+
+		// --- Add wp_localize_script ---
+		// Prepare data to pass (only for the current consent type instance)
+		$consent_data = [];
+		if ($this->is_enabled('live')) {
+			$consent_html = $this->get_consent_html('checkout');
+			if (!empty($consent_html)) {
+				// Use a key specific to this consent type
+				$consent_data[$this->consent_type . '_consent_html'] = $consent_html;
+			}
+		}
+
+		// Only localize if we have data for this specific type
+		if (!empty($consent_data)) {
+			$this->log_debug('Localizing script ' . $script_handle . ' with data for ' . $this->consent_type);
+			error_log('Convert Cart: Localizing script for ' . $this->consent_type . ' with data: ' . print_r($consent_data, true));
+			// Use wp_localize_script to make PHP data available to the script
+			// Note: This will be called twice (once for SMS, once for Email if both active)
+			// We'll need JS to handle potentially merging this data if the object name is the same.
+			// Let's use a unique object name per type for simplicity first.
+			wp_localize_script(
+				$script_handle,
+				'convertcart_consent_data_' . $this->consent_type, // Unique object name (e.g., convertcart_consent_data_sms)
+				$consent_data // Pass the data array
+			);
+		} else {
+			$this->log_debug('No live consent data to localize for ' . $this->consent_type);
+		}
+		// --- End wp_localize_script ---
+	}
+
+	/**
+	 * Setup classic checkout hooks
+	 */
+	protected function setup_classic_checkout_hooks() {
+		$this->log_debug('Setting up classic checkout hooks');
+		
+		// Add the consent checkbox to the checkout form
+		add_action('woocommerce_after_checkout_billing_form', array($this, 'add_consent_to_checkout'));
+		// Or maybe: add_action('woocommerce_review_order_before_submit', array($this, 'add_consent_to_checkout'));
+		
+		// Save the consent value when order is placed
+		add_action('woocommerce_checkout_update_order_meta', array($this, 'save_consent_from_checkout'));
+		
+		$this->log_debug('Classic checkout hooks setup complete.');
+	}
+
+	/**
+	 * Add consent checkbox to checkout form
+	 */
+	public function add_consent_to_checkout() {
+		echo $this->get_consent_html('checkout');
+	}
+
+	/**
+	 * Save consent from checkout
+	 */
+	public function save_consent_from_checkout($order_id) {
+		$consent_field = $this->consent_type . '_consent';
+		if (isset($_POST[$consent_field])) {
+			update_post_meta($order_id, '_' . $consent_field, 'yes');
+		} else {
+			update_post_meta($order_id, '_' . $consent_field, 'no');
+		}
 	}
 } 

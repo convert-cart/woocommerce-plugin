@@ -59,6 +59,8 @@ spl_autoload_register(
 	}
 );
 
+use ConvertCart\Analytics\WC_CC_Analytics; // Ensure this use statement is present
+
 /**
  * Check if WooCommerce is active
  */
@@ -156,32 +158,66 @@ function modify_plugin_action_links($actions, $plugin_file) {
 add_filter('plugin_action_links', 'ConvertCart\Analytics\modify_plugin_action_links', 10, 2);
 
 /**
- * Initialize the plugin.
+ * Load dependencies.
+ * This function now only ensures classes are available if not autoloaded.
  */
-function init() {
-	// Now it's safe to include and use WooCommerce classes
-	require_once dirname( __FILE__ ) . '/includes/core/class-integration.php';
-
-	// Add the integration to WooCommerce.
-	add_filter( 'woocommerce_integrations', 'ConvertCart\Analytics\add_integration', 10 );
-}
-
-/**
- * Add the integration to WooCommerce.
- *
- * @param array $integrations Array of WooCommerce integrations.
- * @return array Updated array of integrations.
- */
-function add_integration( $integrations ) {
-	// Check if WooCommerce is active.
-	if ( ! class_exists( 'WooCommerce' ) ) {
-		return $integrations;
+function load_convertcart_dependencies() {
+	// Check if WooCommerce is active before proceeding
+	if ( ! is_woocommerce_active() ) {
+		return;
 	}
 
-	$integrations[] = 'ConvertCart\Analytics\Core\Integration';
+	// Include the main integration class file if not autoloaded
+	if ( ! class_exists( 'ConvertCart\Analytics\WC_CC_Analytics' ) ) {
+		require_once CC_PLUGIN_PATH . 'includes/class-wc-cc-analytics.php';
+	}
+	// Include Base_Consent if not autoloaded
+	if ( ! class_exists( 'ConvertCart\Analytics\Consent\Base_Consent' ) ) {
+		require_once CC_PLUGIN_PATH . 'includes/consent/class-base-consent.php';
+	}
+	// Include SMS_Consent if not autoloaded
+	if ( ! class_exists( 'ConvertCart\Analytics\Consent\SMS_Consent' ) ) {
+		require_once CC_PLUGIN_PATH . 'includes/consent/class-sms-consent.php';
+	}
+	// Include Email_Consent if not autoloaded
+	if ( ! class_exists( 'ConvertCart\Analytics\Consent\Email_Consent' ) ) {
+		require_once CC_PLUGIN_PATH . 'includes/consent/class-email-consent.php';
+	}
+	// Include Core Integration if needed and not autoloaded
+	if ( ! class_exists( 'ConvertCart\Analytics\Core\Integration' ) ) {
+	    // Assuming the path, adjust if necessary
+		require_once CC_PLUGIN_PATH . 'includes/core/class-integration.php';
+	}
 
+	// REMOVE the manual instantiation:
+	// $GLOBALS['convertcart_analytics_integration'] = new WC_CC_Analytics();
+	// error_log('Convert Cart: WC_CC_Analytics class instantiated.');
+}
+
+// Hook the dependency loader to plugins_loaded
+add_action( 'plugins_loaded', 'ConvertCart\Analytics\load_convertcart_dependencies', 11 ); // Priority 11 to run after WC potentially
+
+/**
+ * Add the integration class name to WooCommerce.
+ * WooCommerce will instantiate it.
+ *
+ * @param array $integrations Existing integrations.
+ * @return array Updated integrations.
+ */
+function add_convertcart_integration( $integrations ) {
+	// Check if the WC_CC_Analytics class exists before adding its name
+	if ( class_exists( 'ConvertCart\Analytics\WC_CC_Analytics' ) ) {
+		// Ensure ONLY WC_CC_Analytics is added here
+		$integrations[] = 'ConvertCart\Analytics\WC_CC_Analytics';
+		error_log('Convert Cart: Adding WC_CC_Analytics class name to WC Integrations.');
+	} else {
+		error_log('Convert Cart: ERROR - WC_CC_Analytics class not found when trying to add to WC Integrations.');
+	}
+	// DO NOT add Core\Integration here
 	return $integrations;
 }
+// Ensure the filter call uses the correct namespaced function name
+add_filter( 'woocommerce_integrations', 'ConvertCart\Analytics\add_convertcart_integration' );
 
 /**
  * Add a more informative admin notice if WooCommerce gets deactivated while our plugin is active
@@ -214,14 +250,57 @@ function admin_notice_missing_woocommerce() {
 // Add notice to plugin row
 add_action('after_plugin_row_' . plugin_basename(__FILE__), 'ConvertCart\Analytics\admin_notice_missing_woocommerce', 10, 2);
 
-// Initialize plugin only if WooCommerce is active
-if (is_woocommerce_active()) {
-	add_action('plugins_loaded', 'ConvertCart\Analytics\init');
-}
-
 // Add HPOS compatibility declaration
 add_action('before_woocommerce_init', function() {
 	if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
 		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
 	}
+});
+
+// Add this near the top of the file, after the plugin header
+add_action('plugins_loaded', function() {
+    error_log('Convert Cart: Plugin loaded');
+});
+
+// Add this to test if WooCommerce hooks are available
+add_action('init', function() {
+    error_log('Convert Cart: Init hook fired');
+    error_log('Convert Cart: WooCommerce class exists: ' . (class_exists('WooCommerce') ? 'yes' : 'no'));
+});
+
+// Keep the wp_head action for CSS
+add_action('wp_head', function() {
+    ?>
+    <style type="text/css">
+        .woocommerce-checkout .consent-checkbox {
+            margin: 1em 0;
+            padding: 0.5em;
+            background: #f8f8f8;
+            border-radius: 3px;
+        }
+        .woocommerce-checkout .consent-checkbox label {
+            display: flex !important;
+            align-items: center;
+            gap: 0.5em;
+            cursor: pointer;
+        }
+        .woocommerce-checkout .consent-checkbox input[type="checkbox"] {
+            margin: 0 !important;
+        }
+    </style>
+    <?php
+});
+
+// Keep the template_redirect check
+add_action('template_redirect', function() {
+    if (is_checkout()) {
+        error_log('Convert Cart: On checkout page');
+        // Log the template only once to reduce noise
+        static $logged_template = false;
+        if (!$logged_template) {
+             error_log('Convert Cart: Current template: ' . get_page_template());
+             $logged_template = true;
+        }
+        // error_log('Convert Cart: Available hooks in checkout: ' . print_r(array_keys($GLOBALS['wp_filter']), true)); // Maybe comment this out too, it's very long
+    }
 });

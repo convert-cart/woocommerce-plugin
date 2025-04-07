@@ -15,7 +15,7 @@ use WP_REST_Request;
 
 defined( 'ABSPATH' ) || exit;
 
-class Integration extends \WC_Integration {
+class Integration {
 
 	/**
 	 * Client ID.
@@ -28,49 +28,12 @@ class Integration extends \WC_Integration {
 	 * Init and hook in the integration.
 	 */
 	public function __construct() {
-		// Make sure WooCommerce is active
-		if ( ! class_exists( 'WC_Integration' ) ) {
-			return;
-		}
-
-		global $woocommerce;
-		$this->id                 = 'cc_analytics';
-		$this->method_title       = __( 'Convert Cart Analytics', 'woocommerce_cc_analytics' );
-		$this->method_description = __( 'Contact Convert Cart To Get Client ID / Domain Id', 'woocommerce_cc_analytics' );
-
-		// Load the settings.
-		$this->init_form_fields();
-		$this->init_settings();
-
-		// Define user set variables.
-		$this->cc_client_id = $this->get_option( 'cc_client_id' );
-
-		// Check for required PHP extensions
-		if (!class_exists('DOMDocument')) {
-			add_action('admin_notices', function() {
-				?>
-				<div class="notice notice-error">
-					<p><?php _e('Convert Cart Analytics requires the PHP DOMDocument extension. Please contact your hosting provider.', 'woocommerce_cc_analytics'); ?></p>
-				</div>
-				<?php
-			});
-			return;
-		}
-
-		// Actions.
-		add_action( 'woocommerce_update_options_integration_' . $this->id, array( $this, 'process_admin_options' ) );
-		add_action( 'admin_menu', array( $this, 'add_menu_items' ), 15 );
-		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
-		add_action( 'admin_init', array( $this, 'register_settings' ) );
-		add_filter( 'parent_file', array( $this, 'highlight_menu_item' ) );
-		add_filter( 'submenu_file', array( $this, 'highlight_submenu_item' ) );
-
-		// Initialize the plugin components.
-		$this->load_dependencies();
-		$this->init_components();
-
-		// Add cache clearing hook
-		add_action('woocommerce_cc_analytics_clear_cache', array($this, 'clear_consent_caches'));
+		// Remove any code here that relies on being a WC_Integration
+		// e.g., setting $this->id, $this->method_title, etc.
+		// Keep the component initialization for now if needed elsewhere,
+		// but ideally, this logic should move to WC_CC_Analytics.
+		// $this->init_components(); // Comment this out for now to prevent early consent instantiation
+		error_log('Core\Integration constructor called.'); // Add log
 	}
 
 	/**
@@ -88,28 +51,15 @@ class Integration extends \WC_Integration {
 	/**
 	 * Initialize plugin components.
 	 */
-	private function init_components() {
-		static $initialized = false;
-		
-		if ($initialized) {
-			return;
-		}
-		
-		$event_manager = new \ConvertCart\Analytics\Events\Event_Manager($this);
-		$data_handler = new \ConvertCart\Analytics\Events\Data_Handler($this);
-		
-		// Initialize consent handlers only if WooCommerce is active
-		if (class_exists('WC_Integration')) {
-			// Initialize SMS consent first
-			$sms_consent = new \ConvertCart\Analytics\Consent\SMS_Consent($this);
-			
-			// Then initialize Email consent
-			$email_consent = new \ConvertCart\Analytics\Consent\Email_Consent($this);
-		}
-		
-		$admin = new \ConvertCart\Analytics\Admin\Admin($this);
-		
-		$initialized = true;
+	public function init_components() {
+		error_log('Core\Integration init_components called.'); // Add log
+		// Comment out the instantiation here
+		// if (class_exists('\ConvertCart\Analytics\Consent\SMS_Consent')) {
+		//     new \ConvertCart\Analytics\Consent\SMS_Consent($this);
+		// }
+		// if (class_exists('\ConvertCart\Analytics\Consent\Email_Consent')) {
+		//     new \ConvertCart\Analytics\Consent\Email_Consent($this);
+		// }
 	}
 
 	/**
@@ -558,6 +508,7 @@ class Integration extends \WC_Integration {
 	public function add_menu_icon_styles() {
 		?>
 		<style>
+			/* Only keep admin menu icon styles */
 			#adminmenu .toplevel_page_convert-cart .wp-menu-image {
 				background-image: url('<?php echo esc_url(CC_PLUGIN_URL . 'assets/images/icon.svg'); ?>');
 				background-repeat: no-repeat;
@@ -566,89 +517,6 @@ class Integration extends \WC_Integration {
 			}
 			#adminmenu .toplevel_page_convert-cart .wp-menu-image:before {
 				content: none;
-			}
-			
-			/* Consent checkbox styles */
-			.sms-consent-checkbox,
-			.email-consent-checkbox {
-				margin: 10px 0;
-				clear: both;
-				display: block;
-			}
-			
-			.sms-consent-checkbox input[type="checkbox"],
-			.email-consent-checkbox input[type="checkbox"] {
-				display: inline-block !important;
-				margin-right: 5px;
-				vertical-align: middle;
-			}
-			
-			.sms-consent-checkbox label,
-			.email-consent-checkbox label {
-				display: inline-block;
-				vertical-align: middle;
-				width: auto;
-				margin: 0;
-			}
-			
-			.sms-consent-checkbox span,
-			.email-consent-checkbox span {
-				vertical-align: middle;
-				display: inline;
-			}
-			
-			/* Checkout form consent styles */
-			.woocommerce-checkout .sms-consent-checkbox,
-			.woocommerce-checkout .email-consent-checkbox {
-				margin: 1em 0;
-				padding: 0;
-				clear: both;
-			}
-			
-			.woocommerce-checkout .sms-consent-checkbox label,
-			.woocommerce-checkout .email-consent-checkbox label {
-				display: flex;
-				align-items: flex-start;
-				margin: 0;
-				cursor: pointer;
-			}
-			
-			.woocommerce-checkout .sms-consent-checkbox input[type="checkbox"],
-			.woocommerce-checkout .email-consent-checkbox input[type="checkbox"] {
-				margin: 3px 8px 0 0;
-			}
-			
-			.woocommerce-checkout .sms-consent-checkbox span,
-			.woocommerce-checkout .email-consent-checkbox span {
-				flex: 1;
-				line-height: 1.5;
-			}
-			
-			/* Registration form consent styles */
-			.woocommerce-form-register .sms-consent-checkbox,
-			.woocommerce-form-register .email-consent-checkbox {
-				margin: 1em 0;
-				padding: 0;
-				clear: both;
-			}
-			
-			.woocommerce-form-register .sms-consent-checkbox label,
-			.woocommerce-form-register .email-consent-checkbox label {
-				display: flex;
-				align-items: flex-start;
-				margin: 0;
-				cursor: pointer;
-			}
-			
-			.woocommerce-form-register .sms-consent-checkbox input[type="checkbox"],
-			.woocommerce-form-register .email-consent-checkbox input[type="checkbox"] {
-				margin: 3px 8px 0 0;
-			}
-			
-			.woocommerce-form-register .sms-consent-checkbox span,
-			.woocommerce-form-register .email-consent-checkbox span {
-				flex: 1;
-				line-height: 1.5;
 			}
 		</style>
 		<?php
@@ -953,6 +821,33 @@ class Integration extends \WC_Integration {
 		if (!$last_clear || (time() - $last_clear) > 300) { // 5 minutes
 			$this->clear_consent_caches();
 			set_transient('cc_analytics_cache_last_clear', time(), 300);
+		}
+	}
+
+	/**
+	 * Add consent styles
+	 */
+	public function add_consent_styles() {
+		?>
+		<style type="text/css">
+			.consent-checkbox {
+				margin: 1em 0;
+				clear: both;
+				display: block;
+			}
+			.consent-checkbox label {
+				display: inline-block;
+				margin-left: 0.5em;
+			}
+		</style>
+		<?php
+	}
+
+	// Add a basic log_debug method if Base_Consent expects it,
+	// although Base_Consent should now use the one from WC_CC_Analytics
+	public function log_debug($message) {
+		if (defined('WP_DEBUG') && WP_DEBUG) {
+			error_log('Core Integration Debug (Fallback): ' . $message);
 		}
 	}
 }

@@ -19,10 +19,28 @@ defined( 'ABSPATH' ) || exit;
 class Email_Consent extends Base_Consent {
 
 	/**
+	 * Constructor
+	 */
+	public function __construct($integration) {
+		// Set consent type and properties BEFORE calling parent constructor
+		$this->consent_type = 'email';
+		$this->set_consent_properties();
+		
+		// Now call parent constructor which will validate properties
+		parent::__construct($integration);
+		
+		// Add hooks after successful initialization
+		if ($this->is_enabled()) {
+			// Hook for updating consent from previous orders - runs after registration save
+			add_action('woocommerce_created_customer', array($this, 'update_consent_from_previous_orders'), 20, 1);
+		}
+	}
+
+	/**
 	 * Set Email-specific properties.
 	 */
 	protected function set_consent_properties() {
-		$this->consent_type                 = 'email';
+		// Don't set consent_type here anymore, it's set in constructor
 		$this->enable_setting_key           = 'enable_email_consent';
 		$this->meta_key                     = 'email_consent';
 		$this->checkout_html_option_key     = 'cc_email_consent_checkout_html';
@@ -36,12 +54,12 @@ class Email_Consent extends Base_Consent {
 	 * @return string
 	 */
 	protected function get_default_checkout_html() {
-		return '<div class="email-consent-checkbox form-row">
-			<label for="email_consent">
-				<input type="checkbox" name="email_consent" id="email_consent" />
-				<span>' . esc_html__( 'I consent to receive email communications.', 'woocommerce_cc_analytics' ) . '</span>
+		return '<p class="form-row form-row-wide">
+			<label class="woocommerce-form__label woocommerce-form__label-for-checkbox checkbox">
+				<input type="checkbox" class="woocommerce-form__input woocommerce-form__input-checkbox input-checkbox" name="email_consent" id="email_consent" />
+				<span>' . esc_html__('I consent to receive email communications', 'woocommerce_cc_analytics') . '</span>
 			</label>
-		</div>';
+		</p>';
 	}
 
 	/**
@@ -50,12 +68,12 @@ class Email_Consent extends Base_Consent {
 	 * @return string
 	 */
 	protected function get_default_registration_html() {
-		return '<div class="email-consent-checkbox form-row">
-			<label for="email_consent">
-				<input type="checkbox" name="email_consent" id="email_consent" />
+		return '<p class="form-row form-row-wide">
+			<label class="woocommerce-form__label woocommerce-form__label-for-checkbox checkbox">
+				<input type="checkbox" class="woocommerce-form__input woocommerce-form__input-checkbox input-checkbox" name="email_consent" id="email_consent" />
 				<span>' . esc_html__('I consent to receive email communications', 'woocommerce_cc_analytics') . '</span>
 			</label>
-		</div>';
+		</p>';
 	}
 
 	/**
@@ -72,19 +90,14 @@ class Email_Consent extends Base_Consent {
 		</div>';
 	}
 
-	public function __construct(Integration $integration) {
-		$this->consent_type = 'email'; // Set this before parent constructor
-		parent::__construct($integration);
-	}
-
 	/**
-	 * Setup hooks - Add Email-specific hooks.
+	 * Setup hooks - This method is now primarily for *Email-specific* hooks.
+	 * The base class handles common checkout, registration, and account hooks.
 	 */
-	protected function setup_hooks() {
-		parent::setup_hooks();
-
-		// Add email-specific hooks
-		add_action('woocommerce_created_customer', array($this, 'update_consent_from_previous_orders'), 20, 1);
+	protected function setup_child_hooks() {
+		parent::setup_child_hooks(); // Good practice to call parent
+		$this->log_debug('Running setup_child_hooks for Email.');
+		// Add any Email-specific hooks here if needed in the future.
 	}
 
 	/**
