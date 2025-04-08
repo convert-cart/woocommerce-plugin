@@ -234,10 +234,8 @@ class WC_CC_Admin extends WC_CC_Base {
             return;
         }
 
-        // Get all settings errors
         $settings_errors = get_settings_errors('cc_consent_settings');
         
-        // If no errors but settings were updated, show success message
         if (empty($settings_errors) && isset($_GET['settings-updated']) && $_GET['settings-updated']) {
             add_settings_error(
                 'cc_consent_settings',
@@ -247,7 +245,6 @@ class WC_CC_Admin extends WC_CC_Base {
             );
         }
 
-        // Display all settings errors/notices
         settings_errors('cc_consent_settings');
     }
 } 

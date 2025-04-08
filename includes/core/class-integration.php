@@ -766,13 +766,11 @@ class Integration {
 	public function clear_consent_caches() {
 		static $cleared = false;
 		
-		// Prevent multiple cache clears in the same request
 		if ($cleared) {
 			return;
 		}
 		
 		try {
-			// Clear specific option caches first (more targeted)
 			$option_keys = array(
 				'cc_sms_consent_checkout_html',
 				'cc_sms_consent_registration_html',
@@ -786,19 +784,14 @@ class Integration {
 				wp_cache_delete($key, 'options');
 			}
 			
-			// Clear WooCommerce caches only if needed
 			if (function_exists('wc_delete_product_transients')) {
 				wc_delete_product_transients();
 				wc_delete_shop_order_transients();
 			}
 			
-			// Only flush WordPress cache if absolutely necessary
-			// wp_cache_flush(); // Commented out as it's too aggressive
-			
 			$cleared = true;
-			
 		} catch (\Exception $e) {
-			error_log('Convert Cart Analytics: Error clearing caches - ' . $e->getMessage());
+			error_log('Convert Cart Analytics: Cache clearing failed');
 		}
 	}
 
@@ -831,12 +824,5 @@ class Integration {
 			}
 		</style>
 		<?php
-	}
-
-	// Fallback debug logger (consider removing if Base_Consent uses WC_CC_Analytics logger)
-	public function log_debug($message) {
-		if (defined('WP_DEBUG') && WP_DEBUG) {
-			error_log('Core Integration Debug (Fallback): ' . $message);
-		}
 	}
 }
