@@ -13,38 +13,9 @@ namespace ConvertCart\Analytics;
 
 use WP_REST_Request;
 
-// Restore inheritance from WC_Integration
 class WC_CC_Analytics extends \WC_Integration {
 
-	/**
-	 * Integration ID.
-	 * @var string
-	 */
-	public $id = 'cc_analytics'; // Declare and initialize
 
-	/**
-	 * Integration method title.
-	 * @var string
-	 */
-	public $method_title; // Declare
-
-	/**
-	 * Integration method description.
-	 * @var string
-	 */
-	public $method_description; // Declare
-
-	/**
-	 * Form fields for settings.
-	 * @var array
-	 */
-	public $form_fields = []; // Declare
-
-	/**
-	 * Settings values.
-	 * @var array
-	 */
-	public $settings = []; // Declare
 
 	/**
 	 * Client ID.
@@ -54,237 +25,189 @@ class WC_CC_Analytics extends \WC_Integration {
 	public $cc_client_id;
 
 	/**
-	 * Debug mode setting.
-	 * @var string ('yes' or 'no')
-	 */
-	public $debug_mode = 'no';
-
-	/**
-	 * SMS Consent setting.
-	 * @var string ('disabled', 'draft', 'live')
-	 */
-	public $enable_sms_consent = 'disabled';
-
-	/**
-	 * Email Consent setting.
-	 * @var string ('disabled', 'draft', 'live')
-	 */
-	public $enable_email_consent = 'disabled';
-
-	/**
-	 * Consent instances.
-	 * @var array<string, \ConvertCart\Analytics\Consent\Base_Consent>
-	 */
-	public $consent_handlers = [];
-
-	/**
-	 * Flag to ensure block data filter is added only once.
-	 * @var bool
-	 */
-	private $block_data_filter_added = false;
-
-	/**
-	 * Constructor - Sets up initial hooks.
+	 * Init and hook in the integration.
 	 */
 	public function __construct() {
-		// $this->id is now initialized in property declaration
+		global $woocommerce;
+		$this->id                 = 'cc_analytics';
 		$this->method_title       = __( 'CC Analytics Settings', 'woocommerce_cc_analytics' );
 		$this->method_description = __( 'Contact Convert Cart To Get Client ID / Domain Id', 'woocommerce_cc_analytics' );
 
-		// Load settings form fields
-		$this->init_form_fields();
-
-		// Load the settings values themselves
-		$this->init_settings(); // This loads saved options into $this->settings
-
-		// Assign main settings to properties
-		$this->cc_client_id = $this->get_option( 'cc_client_id' );
-
-		// Hook for saving settings in admin
-		add_action( 'woocommerce_update_options_integration_' . $this->id, array( $this, 'process_admin_options' ) );
-
-		// --- Core Hooks Setup ---
-		// Defer consent initialization and hook setup until template_redirect
-		add_action('template_redirect', array($this, 'initialize_consent_handlers'), 5);
-
-		// Hooks that need to run on woocommerce_init
-		add_action('woocommerce_init', array($this, 'woocommerce_init_hooks'));
-
-		// Hooks for analytics tracking (if client ID is set)
-		if ( ! empty($this->cc_client_id) ) {
-		add_action( 'wp_head', array( $this, 'cc_init' ) );
-		add_action( 'wp_footer', array( $this, 'addEvents' ) );
-		add_action( 'woocommerce_thankyou', array( $this, 'ordered' ) );
-			// ... other tracking hooks ...
-		}
-
-		// Hooks for REST API endpoints
-		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
-
-		// Hooks for category webhooks
-		add_action( 'create_product_cat', array( $this, 'handle_category_created' ), 10, 2 );
-		add_action( 'edit_product_cat', array( $this, 'handle_category_updated' ), 10, 2 );
-		add_action( 'delete_product_cat', array( $this, 'handle_category_deleted' ), 10, 2 );
-		add_action( 'woocommerce_admin_product_category_webhook_handler', array( $this, 'sendCategoryRelatedNotification' ), 10, 1 );
-
-		// Hook for WP-CLI commands
-		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			add_action( 'init', array( $this, 'register_cli_commands' ) );
-		}
-
-		$this->log_debug('WC_CC_Analytics Constructor finished.');
-	}
-
-	/**
-	 * Register REST API routes.
-	 */
-	public function register_rest_routes() {
-				register_rest_route(
-					'wc/v3',
-					'cc-version',
-			array( /* ... */ )
-		);
-				register_rest_route(
-			'wc/v3',
-			'cc-plugin-info',
-			array( /* ... */ )
-		);
-		// Add other routes here
-		$this->log_debug('REST routes registered.');
-	}
-
-	/**
-	 * Handle category created webhook trigger.
-	 */
-	public function handle_category_created( $term_id, $args ) {
-		do_action( 'woocommerce_admin_product_category_webhook_handler', [ /* ... */ ] );
-	}
-	// ... handle_category_updated, handle_category_deleted ...
-
-
-	/**
-	 * Initialize consent handlers and setup their hooks.
-	 */
-	public function initialize_consent_handlers() {
-		$options = get_option('woocommerce_cc_analytics_settings', array());
-		$sms_enabled = isset($options['enable_sms_consent']) && $options['enable_sms_consent'] !== 'disabled';
-		$email_enabled = isset($options['enable_email_consent']) && $options['enable_email_consent'] !== 'disabled';
-		
-		if (!$sms_enabled && !$email_enabled) {
-			return;
-		}
-		
-		if ($sms_enabled && class_exists('ConvertCart\Analytics\Consent\SMS_Consent')) {
-			new \ConvertCart\Analytics\Consent\SMS_Consent($this);
-		}
-		
-		if ($email_enabled && class_exists('ConvertCart\Analytics\Consent\Email_Consent')) {
-			new \ConvertCart\Analytics\Consent\Email_Consent($this);
-		}
-	}
-
-	/**
-	 * NEW METHOD: Add consent HTML for all enabled handlers to block checkout data.
-	 * Hooked to woocommerce_blocks_checkout_render_block_data.
-	 *
-	 * @param array $data Block data.
-	 * @return array Modified block data.
-	 */
-	public function add_all_consent_to_block_checkout_data($data) {
-		$this->log_debug('Running add_all_consent_to_block_checkout_data filter callback.');
-		error_log('Convert Cart: Running add_all_consent_to_block_checkout_data filter.');
-
-		// Explicitly check if the handlers array is populated *at this point*
-		if (empty($this->consent_handlers)) {
-			$this->log_debug('CRITICAL: $this->consent_handlers is EMPTY inside the filter callback.');
-			error_log('Convert Cart: CRITICAL - consent_handlers is EMPTY in filter callback.');
-			// Log the state of the main settings just in case
-			error_log('Convert Cart: Current settings in filter: ' . print_r($this->settings, true));
-			return $data; // Exit early if no handlers are registered
-		} else {
-			$this->log_debug('Filter Callback: $this->consent_handlers contains keys: ' . implode(', ', array_keys($this->consent_handlers)));
-			error_log('Convert Cart: Filter Callback - consent_handlers keys: ' . implode(', ', array_keys($this->consent_handlers)));
-		}
-
-		// Ensure the extensions structure exists
-		if (!isset($data['extensions'])) {
-			$data['extensions'] = array();
-		}
-		if (!isset($data['extensions']['convertcart-analytics'])) {
-			$data['extensions']['convertcart-analytics'] = array();
-		}
-
-		// Loop through the instantiated handlers
-		foreach ($this->consent_handlers as $type => $handler) {
-			// Ensure $handler is a valid object
-			if (!is_object($handler) || !method_exists($handler, 'is_enabled') || !method_exists($handler, 'get_consent_html')) {
-				$this->log_debug("Filter Callback: Invalid handler object for type '{$type}'. Skipping.");
-				error_log("Convert Cart: Filter Callback - Invalid handler object for type '{$type}'.");
-				continue;
-			}
-
-			$this->log_debug("Filter Callback: Processing handler: " . $type);
-			error_log("Convert Cart: Filter Callback - Processing handler: " . $type);
-
-			// Check if this specific handler is enabled for 'live' mode
-			$is_live = $handler->is_enabled('live'); // Store result
-			$this->log_debug("Filter Callback: Handler '{$type}' is_enabled('live') check returned: " . ($is_live ? 'Yes' : 'No'));
-			error_log("Convert Cart: Filter Callback - Handler '{$type}' is_live: " . ($is_live ? 'Yes' : 'No'));
-
-			if ($is_live) {
-				$this->log_debug("Filter Callback: Handler '{$type}' is live. Getting HTML.");
-				error_log("Convert Cart: Filter Callback - Handler '{$type}' is live. Getting HTML.");
-				// Get the HTML using the handler's method
-				$consent_html = $handler->get_consent_html('checkout');
-				// Log the raw HTML fetched
-				$this->log_debug("Filter Callback: Handler '{$type}' get_consent_html('checkout') returned: " . $consent_html);
-				error_log("Convert Cart: Filter Callback - Handler '{$type}' HTML: " . $consent_html);
-
-				// Add it to the block data only if HTML is not empty
-				if (!empty($consent_html)) {
-					$data['extensions']['convertcart-analytics'][$type . '_consent_html'] = $consent_html;
-					$this->log_debug("Filter Callback: Added {$type}_consent_html to block data.");
-					error_log("Convert Cart: Filter Callback - Added {$type}_consent_html to block data.");
-				} else {
-					$this->log_debug("Filter Callback: Handler '{$type}' returned EMPTY HTML. Not adding to data.");
-					error_log("Convert Cart: Filter Callback - Handler '{$type}' returned EMPTY HTML.");
-				}
-
-			} else {
-				$this->log_debug("Filter Callback: Handler '{$type}' is not live. Skipping HTML addition.");
-				error_log("Convert Cart: Filter Callback - Handler '{$type}' is not live. Skipping.");
-			}
-		}
-
-		// Log the final data structure just before returning
-		$this->log_debug('Filter Callback: Final block data structure: ' . print_r($data, true));
-		error_log('Convert Cart: Filter Callback - Final block data: ' . print_r($data, true));
-
-		return $data;
-	}
-
-	/**
-	 * Hooks that need to run on woocommerce_init.
-	 */
-	public function woocommerce_init_hooks() {
-		$this->log_debug('Running woocommerce_init hooks.');
-		// Add hooks here that specifically depend on WC()->cart, WC()->session etc.
-		// Example: add_action('woocommerce_add_to_cart', array($this, 'track_add_to_cart'));
-	}
-
-	/**
-	 * Initialize the plugin. Load settings and hooks.
-	 * REMOVE consent initialization from here if it was present.
-	 */
-	public function init() {
-		// Load settings.
+		// Load the settings.
 		$this->init_form_fields();
 		$this->init_settings();
 
-		// ... (other init logic) ...
+		// Define user set variables.
+		$this->cc_client_id = $this->get_option( 'cc_client_id' );
+		add_action( 'woocommerce_update_options_integration_' . $this->id, array( $this, 'process_admin_options' ) );
 
-		// ... (other hooks added in init) ...
-		$this->log_debug('Core plugin init complete.');
+		if ( ! isset( $this->cc_client_id ) || '' === $this->cc_client_id ) {
+			return;
+		}
+
+		// Actions added below.
+		add_action( 'wp_head', array( $this, 'cc_init' ) );
+		add_action( 'wp_footer', array( $this, 'addEvents' ) );
+		add_action( 'woocommerce_thankyou', array( $this, 'ordered' ) );
+		add_action(
+			'create_product_cat',
+			function ( $term_id, $args ) {
+				do_action(
+					'woocommerce_admin_product_category_webhook_handler',
+					array(
+						'term'     => $term_id,
+						'topic'    => 'category.created',
+						'category' => $args,
+					)
+				);
+			},
+			10,
+			3
+		);
+		add_action(
+			'edit_product_cat',
+			function ( $term_id, $args ) {
+				do_action(
+					'woocommerce_admin_product_category_webhook_handler',
+					array(
+						'term'     => $term_id,
+						'topic'    => 'category.updated',
+						'category' => $args,
+					)
+				);
+			},
+			10,
+			3
+		);
+		add_action(
+			'delete_product_cat',
+			function ( $term_id, $tt_id = '' ) {
+				do_action(
+					'woocommerce_admin_product_category_webhook_handler',
+					array(
+						'term'  => $term_id,
+						'topic' => 'category.deleted',
+					)
+				);
+			},
+			10,
+			3
+		);
+		add_action( 'woocommerce_admin_product_category_webhook_handler', array( $this, 'sendCategoryRelatedNotification' ), 10, 1 );
+		add_action(
+			'rest_api_init',
+			function () {
+				register_rest_route(
+					'wc/v3',
+					'cc-version',
+					array(
+						'methods'             => 'GET',
+						'callback'            => array( $this, 'getVersionList' ),
+						'permission_callback' => array( $this, 'permissionCallback' ),
+					)
+				);
+			}
+		);
+		add_action(
+			'rest_api_init',
+			function () {
+				register_rest_route(
+					'wc/v3', // Namespace
+					'cc-plugin-info', // Route
+					array(
+						'methods'             => 'GET', // HTTP method
+						'callback'            => array( $this, 'get_plugin_info' ), // Callback function
+						'permission_callback' => array( $this, 'permissionCallback' ), // Permission check
+					)
+				);
+			}
+		);
+
+		// Filters
+		add_filter(
+			'woocommerce_rest_product_object_query',
+			function ( array $args, \WP_REST_Request $request ) {
+				$modified_after = $request->get_param( 'modified_after' );
+
+				if ( ! $modified_after ) {
+					return $args;
+				}
+
+				$args['date_query'][0]['column'] = 'post_modified';
+				$args['date_query'][0]['after']  = $modified_after;
+
+				return $args;
+			},
+			10,
+			2
+		);
+
+		add_filter(
+			'woocommerce_rest_orders_prepare_object_query',
+			function ( array $args, \WP_REST_Request $request ) {
+				$modified_after = $request->get_param( 'modified_after' );
+				if ( ! $modified_after ) {
+					return $args;
+				}
+
+				$args['date_query'][0]['column'] = 'post_modified';
+				$args['date_query'][0]['after']  = $modified_after;
+				return $args;
+			},
+			10,
+			2
+		);
+
+		add_filter( 'woocommerce_rest_customer_query', array( $this, 'addUpdatedSinceFilterToRESTApi' ), 10, 2 );
+		add_filter( 'rest_product_collection_params', array( $this, 'maximum_api_filter' ) );
+		add_action( 'woocommerce_review_order_before_submit', array( $this, 'add_sms_consent_checkbox' ) );
+		add_action( 'woocommerce_review_order_before_submit', array( $this, 'add_email_consent_checkbox' ) );
+		add_action( 'woocommerce_checkout_create_order', array( $this, 'save_sms_consent_to_order_or_customer' ), 10, 2 );
+		add_action( 'woocommerce_checkout_create_order', array( $this, 'save_email_consent_to_order_or_customer' ), 10, 2 );
+		add_action( 'woocommerce_created_customer', array( $this, 'save_sms_consent_when_account_is_created' ), 10, 3 );
+		add_action( 'woocommerce_created_customer', array( $this, 'save_email_consent_when_account_is_created' ), 10, 3 );
+		add_action( 'woocommerce_edit_account_form', array( $this, 'add_sms_consent_checkbox_to_account_page' ) );
+		add_action( 'woocommerce_edit_account_form', array( $this, 'add_email_consent_checkbox_to_account_page' ) );
+		add_action( 'woocommerce_save_account_details', array( $this, 'save_sms_consent_from_account_page' ), 12, 1 );
+		add_action( 'woocommerce_save_account_details', array( $this, 'save_email_consent_from_account_page' ), 12, 1 );
+		add_action( 'woocommerce_register_form', array( $this, 'add_sms_consent_to_registration_form' ) );
+		add_action( 'woocommerce_register_form', array( $this, 'add_email_consent_to_registration_form' ) );
+		add_action( 'woocommerce_created_customer', array( $this, 'save_sms_consent_from_registration_form' ), 10, 1 );
+		add_action( 'woocommerce_created_customer', array( $this, 'save_email_consent_from_registration_form' ), 10, 1 );
+		add_action( 'woocommerce_created_customer', array( $this, 'update_consent_from_previous_orders' ), 20, 3 );
+		add_action( 'woocommerce_created_customer', array( $this, 'update_consent_from_previous_orders_email' ), 20, 3 );
+		add_action( 'admin_menu', array( $this, 'add_convert_cart_menu' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_codemirror_assets' ) );
+		add_action( 'admin_head', array( $this, 'add_menu_icon_styles' ) );
+		add_filter( 'parent_file', array( $this, 'highlight_menu_item' ) );
+		add_filter( 'submenu_file', array( $this, 'highlight_submenu_item' ) );
+
+		if (defined('WP_CLI') && WP_CLI) {
+			WP_CLI::add_command('cc-consent', function($args, $assoc_args) {
+				$user_id = $assoc_args['user'] ?? get_current_user_id();
+				
+				// Check SMS consent
+				$sms_consent = get_user_meta($user_id, 'sms_consent', true);
+				WP_CLI::line(sprintf('SMS Consent for user %d: %s', $user_id, $sms_consent ?: 'not set'));
+				
+				// Check Email consent
+				$email_consent = get_user_meta($user_id, 'email_consent', true);
+				WP_CLI::line(sprintf('Email Consent for user %d: %s', $user_id, $email_consent ?: 'not set'));
+			}, array(
+				'shortdesc' => 'Check consent status for a user',
+				'synopsis' => array(
+					array(
+						'type'        => 'assoc',
+						'name'        => 'user',
+						'description' => 'User ID to check',
+						'optional'    => true,
+					),
+				),
+			));
+		}
+
+		// Add this line with the other action hooks
+		add_action('admin_init', array($this, 'register_settings'));
 	}
 
 	/**
@@ -335,14 +258,12 @@ class WC_CC_Analytics extends \WC_Integration {
 	 * Initialize integration settings.
 	 */
 	public function init_settings() {
-		// Let the parent WC_Integration handle loading settings
-		parent::init_settings();
-
-		// Now assign specific settings to our declared properties after parent loads them
-		$this->cc_client_id         = $this->get_option('cc_client_id');
-		$this->debug_mode           = $this->get_option('debug_mode', 'no'); // Use default if not set
-		$this->enable_sms_consent   = $this->get_option('enable_sms_consent', 'disabled');
-		$this->enable_email_consent = $this->get_option('enable_email_consent', 'disabled');
+		$this->settings = get_option( $this->plugin_id . $this->id . '_settings', null );
+		if ( is_array( $this->settings ) ) {
+			foreach ( $this->settings as $key => $value ) {
+				$this->$key = $value;
+			}
+		}
 	}
 
 	/**
@@ -1120,206 +1041,508 @@ class WC_CC_Analytics extends \WC_Integration {
 	}
 
     /**
-     * Adds Convert Cart menu to the admin dashboard.
-     *
-     * @return void
+     * Add Convert Cart menu and submenus.
      */
 	public function add_convert_cart_menu() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
-
-		// Only show the menu if SMS consent is enabled
-		if ( isset( $options['enable_sms_consent'] ) && ( $options['enable_sms_consent'] === 'live' || $options['enable_sms_consent'] === 'draft' ) ) {
-			add_menu_page(
-				__( 'Convert Cart', 'woocommerce_cc_analytics' ),
-				__( 'Convert Cart', 'woocommerce_cc_analytics' ),
-				'manage_options',
-				'convert-cart-settings',
-				array( $this, 'render_convert_cart_settings_page' ),
-				'dashicons-edit',
-				60
-			);
-		}
-
-		// Only show the menu if email consent is enabled
-		if ( isset( $options['enable_email_consent'] ) && ( $options['enable_email_consent'] === 'live' || $options['enable_email_consent'] === 'draft' ) ) {
-			add_menu_page(
-				__( 'Convert Cart', 'woocommerce_cc_analytics' ),
-				__( 'Convert Cart', 'woocommerce_cc_analytics' ),
-				'manage_options',
-				'convert-cart-settings',
-				array( $this, 'render_convert_cart_settings_page' ),
-				'dashicons-edit',
-				60
-			);
-		}
-	}
-
-    /**
-     * Enqueues CodeMirror assets for the Convert Cart settings page.
-     *
-     * @return void
-     */
-	public function enqueue_codemirror_assets() {
-		// Only load on our plugin's admin page
-		$screen = get_current_screen();
-		if ( $screen->id !== 'toplevel_page_convert-cart-settings' ) {
+		$sms_enabled = isset( $options['enable_sms_consent'] ) && ( $options['enable_sms_consent'] === 'live' || $options['enable_sms_consent'] === 'draft' );
+		$email_enabled = isset( $options['enable_email_consent'] ) && ( $options['enable_email_consent'] === 'live' || $options['enable_email_consent'] === 'draft' );
+		
+		// Only show the menu if either SMS or Email consent is enabled
+		if ( !$sms_enabled && !$email_enabled ) {
 			return;
 		}
 		
-		wp_enqueue_code_editor( array( 'type' => 'text/html' ) );
-		wp_enqueue_script( 'wp-theme-plugin-editor' );
-		wp_enqueue_style( 'wp-codemirror' );
+		// Add main menu
+		$parent_slug = 'convert-cart';
+			add_menu_page(
+				__( 'Convert Cart', 'woocommerce_cc_analytics' ),
+				__( 'Convert Cart', 'woocommerce_cc_analytics' ),
+			'manage_woocommerce',
+			$parent_slug,
+			null,
+			'', // Icon is added via CSS
+			59
+		);
 		
-		// Add inline script to initialize CodeMirror
-		wp_add_inline_script( 'wp-theme-plugin-editor', '
-			jQuery(document).ready(function($) {
-				// Initialize CodeMirror for each textarea
-				var editor_settings = wp.codeEditor.defaultSettings ? _.clone(wp.codeEditor.defaultSettings) : {};
-				editor_settings.codemirror = _.extend(
-					{},
-					editor_settings.codemirror,
-					{
-						mode: "htmlmixed",
-						indentUnit: 2,
-						tabSize: 2,
-						lineNumbers: true,
-						theme: "default"
-					}
-				);
-				
-				// Initialize editors for SMS consent
-				if ($("#cc_sms_consent_checkout_html").length) {
-					wp.codeEditor.initialize($("#cc_sms_consent_checkout_html"), editor_settings);
-					wp.codeEditor.initialize($("#cc_sms_consent_registration_html"), editor_settings);
-					wp.codeEditor.initialize($("#cc_sms_consent_account_html"), editor_settings);
-				}
-				
-				// Initialize editors for Email consent
-				if ($("#cc_email_consent_checkout_html").length) {
-					wp.codeEditor.initialize($("#cc_email_consent_checkout_html"), editor_settings);
-					wp.codeEditor.initialize($("#cc_email_consent_registration_html"), editor_settings);
-					wp.codeEditor.initialize($("#cc_email_consent_account_html"), editor_settings);
-				}
-			});
-		' );
+		// Add Dashboard submenu
+		add_submenu_page(
+			$parent_slug,
+			__( 'Convert Cart Dashboard', 'woocommerce_cc_analytics' ),
+			__( 'Dashboard', 'woocommerce_cc_analytics' ),
+			'manage_woocommerce',
+			$parent_slug,
+			array( $this, 'render_dashboard_page' )
+		);
+		
+		// Add SMS Consent submenu if enabled
+		if ( $sms_enabled ) {
+			add_submenu_page(
+				$parent_slug,
+				__( 'SMS Consent', 'woocommerce_cc_analytics' ),
+				__( 'SMS Consent', 'woocommerce_cc_analytics' ),
+				'manage_woocommerce',
+				'convert-cart-sms-consent',
+				array( $this, 'render_sms_consent_page' )
+			);
+		}
+		
+		// Add Email Consent submenu if enabled
+		if ( $email_enabled ) {
+			add_submenu_page(
+				$parent_slug,
+				__( 'Email Consent', 'woocommerce_cc_analytics' ),
+				__( 'Email Consent', 'woocommerce_cc_analytics' ),
+				'manage_woocommerce',
+				'convert-cart-email-consent',
+				array( $this, 'render_email_consent_page' )
+			);
+		}
+		
+		// Add Settings submenu at the bottom
+		add_submenu_page(
+			$parent_slug,
+			__( 'Convert Cart Settings', 'woocommerce_cc_analytics' ),
+			__( 'Domain Settings', 'woocommerce_cc_analytics' ),
+			'manage_woocommerce',
+			'admin.php?page=wc-settings&tab=integration&section=' . $this->id,
+			''
+		);
 	}
 
 	/**
-	 * Renders the Convert Cart settings page.
-	 *
-	 * @return void
+	 * Add custom menu icon styles
 	 */
-	public function render_convert_cart_settings_page() {
-		$options = get_option( 'woocommerce_cc_analytics_settings' );
-		if ( isset( $options['enable_sms_consent'] ) && ( $options['enable_sms_consent'] === 'live' || $options['enable_sms_consent'] === 'draft' ) ) {
-			if ( isset( $_POST['save_convert_cart_html'] ) && isset( $_POST['cc_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['cc_nonce'] ) ), 'save_convert_cart_html' ) ) {
-				// PHP Validation to ensure the sms_consent checkbox is present
-				$cc_sms_consent_checkout_html     = wp_kses_post( stripslashes( $_POST['cc_sms_consent_checkout_html'] ) );
-				$cc_sms_consent_registration_html = wp_kses_post( stripslashes( $_POST['cc_sms_consent_registration_html'] ) );
-				$cc_sms_consent_account_html      = wp_kses_post( stripslashes( $_POST['cc_sms_consent_account_html'] ) );
-				
-				// Save custom HTML snippets to options if valid
-				update_option( 'cc_sms_consent_checkout_html', $cc_sms_consent_checkout_html );
-				update_option( 'cc_sms_consent_registration_html', $cc_sms_consent_registration_html );
-				update_option( 'cc_sms_consent_account_html', $cc_sms_consent_account_html );
-
-				echo '<div class="updated"><p>HTML Snippets saved successfully!</p></div>';
+	public function add_menu_icon_styles() {
+		?>
+		<style>
+			#adminmenu .toplevel_page_convert-cart .wp-menu-image {
+				background-image: url('<?php echo esc_url(plugin_dir_url( dirname( __FILE__ ) ) . 'assets/images/icon.svg'); ?>');
+				background-repeat: no-repeat;
+				background-position: center center;
+				background-size: 20px auto;
 			}
+			#adminmenu .toplevel_page_convert-cart .wp-menu-image:before {
+				content: none;
+			}
+		</style>
+		<?php
+	}
 
-			// Add nonce field to the form
-			echo '<form method="POST" id="convert-cart-form">';
-			wp_nonce_field( 'save_convert_cart_html', 'cc_nonce' );
-
-			// Default HTML snippets as fallback
-			$default_checkout_html = '<div class="sms-consent-checkbox"><label for="sms_consent"><input type="checkbox" name="sms_consent" id="sms_consent"> I consent to receive SMS communications.</label></div>';
-
-			$default_registration_html = '<p class="form-row form-row-wide"><label for="sms_consent">' . esc_html__( 'I consent to receive SMS communications', 'woocommerce' ) . '</label><input type="checkbox" name="sms_consent" id="sms_consent"></p>';
-
-			$default_account_html = '<p class="form-row form-row-wide"><label for="sms_consent">' . esc_html__( 'I consent to receive SMS communications', 'woocommerce' ) . '</label><input type="checkbox" name="sms_consent" id="sms_consent"></p>';
-
-			// Get the saved HTML snippets or use defaults
-			$checkout_html     = get_option( 'cc_sms_consent_checkout_html', $default_checkout_html );
-			$registration_html = get_option( 'cc_sms_consent_registration_html', $default_registration_html );
-			$account_html      = get_option( 'cc_sms_consent_account_html', $default_account_html );
-
-			?>
-			<div class="wrap">
-				<h1><?php _e( 'Convert Cart HTML Snippets', 'woocommerce_cc_analytics' ); ?></h1>
-				<h2><?php _e( 'Checkout Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
-				<textarea id="cc_sms_consent_checkout_html" name="cc_sms_consent_checkout_html" rows="10"
-					cols="50"><?php echo esc_textarea( $checkout_html ); ?></textarea>
-
-				<h2><?php _e( 'Registration Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
-				<textarea id="cc_sms_consent_registration_html" name="cc_sms_consent_registration_html" rows="10"
-					cols="50"><?php echo esc_textarea( $registration_html ); ?></textarea>
-
-				<h2><?php _e( 'My Account Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
-				<textarea id="cc_sms_consent_account_html" name="cc_sms_consent_account_html" rows="10"
-					cols="50"><?php echo esc_textarea( $account_html ); ?></textarea>
-
-				<p><input type="submit" name="save_convert_cart_html" value="Save SMS Consent HTML Snippets" class="button-primary"></p>
-			</div>
-			<?php
+	/**
+	 * Highlight the correct parent menu item
+	 *
+	 * @param string $parent_file The parent file.
+	 * @return string
+	 */
+	public function highlight_menu_item( $parent_file ) {
+		global $current_screen;
+		$plugin_page = isset($_GET['page']) ? $_GET['page'] : '';
+		
+		if (in_array($plugin_page, array(
+			'convert-cart',
+			'convert-cart-sms-consent',
+			'convert-cart-email-consent'
+		))) {
+			return 'convert-cart';
 		}
-		if ( isset( $options['enable_email_consent'] ) && ( $options['enable_email_consent'] === 'live' || $options['enable_email_consent'] === 'draft' ) ) {
-			if ( isset( $_POST['save_convert_cart_email_html'] ) && isset( $_POST['cc_email_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['cc_email_nonce'] ) ), 'save_convert_cart_email_html' ) ) {
-				// PHP Validation to ensure the email_consent checkbox is present
-				$cc_email_consent_checkout_html = wp_kses_post( stripslashes( $_POST['cc_email_consent_checkout_html'] ) );
-				$cc_email_consent_registration_html = wp_kses_post( stripslashes( $_POST['cc_email_consent_registration_html'] ) );
-				$cc_email_consent_account_html = wp_kses_post( stripslashes( $_POST['cc_email_consent_account_html'] ) );
+		
+		if ( isset( $_GET['page'] ) && 
+			 $_GET['page'] === 'wc-settings' && 
+			 isset( $_GET['tab'] ) && 
+			 $_GET['tab'] === 'integration' && 
+			 isset( $_GET['section'] ) && 
+			 $_GET['section'] === $this->id 
+		) {
+			return 'convert-cart';
+		}
+		
+		return $parent_file;
+	}
+
+	/**
+	 * Highlight the correct submenu item
+	 *
+	 * @param string $submenu_file The submenu file.
+	 * @return string
+	 */
+	public function highlight_submenu_item( $submenu_file ) {
+		if ( isset( $_GET['page'] ) && 
+			 $_GET['page'] === 'wc-settings' && 
+			 isset( $_GET['tab'] ) && 
+			 $_GET['tab'] === 'integration' && 
+			 isset( $_GET['section'] ) && 
+			 $_GET['section'] === $this->id 
+		) {
+			return 'admin.php?page=wc-settings&tab=integration&section=' . $this->id;
+		}
+		
+		return $submenu_file;
+	}
+
+	/**
+	 * Render dashboard page
+	 */
+	public function render_dashboard_page() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'woocommerce_cc_analytics' ) );
+		}
+		
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Convert Cart Dashboard', 'woocommerce_cc_analytics' ); ?></h1>
+			<div class="card">
+				<h2><?php esc_html_e( 'Welcome to Convert Cart', 'woocommerce_cc_analytics' ); ?></h2>
+				<p><?php esc_html_e( 'Use the menu on the left to navigate to different Convert Cart settings.', 'woocommerce_cc_analytics' ); ?></p>
 				
-				// Server-side validation to ensure email_consent checkbox is present
-				if (
-					strpos( $cc_email_consent_checkout_html, 'name="email_consent"' ) === false ||
-					strpos( $cc_email_consent_registration_html, 'name="email_consent"' ) === false ||
-					strpos( $cc_email_consent_account_html, 'name="email_consent"' ) === false
-				) {
-					echo '<div class="error"><p>Error: The "email_consent" checkbox must be present in all snippets.</p></div>';
-				} else {
-					// Save custom HTML snippets to options if valid
-					update_option( 'cc_email_consent_checkout_html', $cc_email_consent_checkout_html );
-					update_option( 'cc_email_consent_registration_html', $cc_email_consent_registration_html );
-					update_option( 'cc_email_consent_account_html', $cc_email_consent_account_html );
-					
-					echo '<div class="updated"><p>HTML Snippets saved successfully!</p></div>';
+				<?php if ( empty( $this->cc_client_id ) ) : ?>
+					<div class="notice notice-warning inline">
+						<p>
+							<?php 
+							printf(
+								/* translators: %s: settings page URL */
+								esc_html__( 'Please configure your Domain ID in the %s to fully activate Convert Cart.', 'woocommerce_cc_analytics' ),
+								'<a href="' . esc_url( admin_url( 'admin.php?page=wc-settings&tab=integration&section=' . $this->id ) ) . '">' . esc_html__( 'Domain Settings', 'woocommerce_cc_analytics' ) . '</a>'
+							); 
+							?>
+						</p>
+					</div>
+				<?php endif; ?>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render SMS consent settings page
+	 */
+	public function render_sms_consent_page() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'woocommerce_cc_analytics' ) );
+		}
+
+		// Handle restore all defaults
+		if ( isset( $_POST['restore_all'] ) && isset( $_POST['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'cc_sms_consent_settings' ) ) {
+			$default_html = $this->get_default_sms_consent_html();
+			update_option( 'cc_sms_consent_checkout_html', $default_html );
+			update_option( 'cc_sms_consent_registration_html', $default_html );
+			update_option( 'cc_sms_consent_account_html', $default_html );
+			
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'All SMS Consent HTML templates have been restored to defaults.', 'woocommerce_cc_analytics' ) . '</p></div>';
+			
+			// Refresh the values
+			$checkout_html = $default_html;
+			$registration_html = $default_html;
+			$account_html = $default_html;
+		} 
+		// Handle form submission
+		else if ( isset( $_POST['submit'] ) && isset( $_POST['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'cc_sms_consent_settings' ) ) {
+			if ( isset( $_POST['cc_sms_consent_checkout_html'] ) ) {
+				// Use custom sanitization that preserves form elements
+				$checkout_html = $this->sanitize_consent_html( wp_unslash( $_POST['cc_sms_consent_checkout_html'] ), true );
+				update_option( 'cc_sms_consent_checkout_html', $checkout_html );
+			}
+			if ( isset( $_POST['cc_sms_consent_registration_html'] ) ) {
+				$registration_html = $this->sanitize_consent_html( wp_unslash( $_POST['cc_sms_consent_registration_html'] ), true );
+				update_option( 'cc_sms_consent_registration_html', $registration_html );
+			}
+			if ( isset( $_POST['cc_sms_consent_account_html'] ) ) {
+				$account_html = $this->sanitize_consent_html( wp_unslash( $_POST['cc_sms_consent_account_html'] ), true );
+				update_option( 'cc_sms_consent_account_html', $account_html );
+			}
+			
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'SMS Consent settings saved successfully.', 'woocommerce_cc_analytics' ) . '</p></div>';
+		}
+		// Load existing values
+		else {
+			$consent_mode = $this->get_option( 'enable_sms_consent', 'disabled' );
+			$checkout_html = get_option( 'cc_sms_consent_checkout_html' );
+			$registration_html = get_option( 'cc_sms_consent_registration_html' );
+			$account_html = get_option( 'cc_sms_consent_account_html' );
+			
+			// Set default values if empty
+			if ( empty( $checkout_html ) ) {
+				$checkout_html = $this->get_default_sms_consent_html();
+				update_option( 'cc_sms_consent_checkout_html', $checkout_html );
+			}
+			if ( empty( $registration_html ) ) {
+				$registration_html = $this->get_default_sms_consent_html();
+				update_option( 'cc_sms_consent_registration_html', $registration_html );
+			}
+			if ( empty( $account_html ) ) {
+				$account_html = $this->get_default_sms_consent_html();
+				update_option( 'cc_sms_consent_account_html', $account_html );
+			}
+		}
+
+		// Use inline HTML instead of including a file that might not exist
+		?>
+		<div class="wrap">
+			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
+			
+			<?php if ( isset($consent_mode) && $consent_mode === 'disabled' ) : ?>
+				<div class="notice notice-warning">
+					<p><?php esc_html_e( 'SMS Consent collection is currently disabled. Enable it in Convert Cart Analytics settings to customize the consent forms.', 'woocommerce_cc_analytics' ); ?></p>
+				</div>
+			<?php endif; ?>
+
+			<form method="post" id="convert-cart-form">
+				<?php wp_nonce_field( 'cc_sms_consent_settings' ); ?>
+				
+				<h2><?php esc_html_e( 'Checkout Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
+				<div class="code-editor-wrapper">
+					<textarea id="cc_sms_consent_checkout_html" name="cc_sms_consent_checkout_html" rows="5" cols="50" class="large-text code consent-html-editor"><?php echo esc_textarea( $checkout_html ); ?></textarea>
+				</div>
+
+				<h2><?php esc_html_e( 'Registration Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
+				<div class="code-editor-wrapper">
+					<textarea id="cc_sms_consent_registration_html" name="cc_sms_consent_registration_html" rows="5" cols="50" class="large-text code consent-html-editor"><?php echo esc_textarea( $registration_html ); ?></textarea>
+				</div>
+
+				<h2><?php esc_html_e( 'My Account Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
+				<div class="code-editor-wrapper">
+					<textarea id="cc_sms_consent_account_html" name="cc_sms_consent_account_html" rows="5" cols="50" class="large-text code consent-html-editor"><?php echo esc_textarea( $account_html ); ?></textarea>
+				</div>
+
+				<div class="submit-buttons" style="display: flex; gap: 10px; margin-top: 20px;">
+					<input type="submit" name="restore_all" id="restore_all_button" value="<?php esc_attr_e('Restore All to Default', 'woocommerce_cc_analytics'); ?>" class="button button-secondary">
+					<?php submit_button( __( 'Save SMS Consent Settings', 'woocommerce_cc_analytics' ), 'primary', 'submit', false ); ?>
+				</div>
+			</form>
+		</div>
+		
+		<script>
+		jQuery(document).ready(function($) {
+			// Add confirmation to the Restore All button
+			$('#restore_all_button').on('click', function(e) {
+				if (!confirm('<?php echo esc_js(__('Are you sure you want to restore all HTML templates to default? This cannot be undone.', 'woocommerce_cc_analytics')); ?>')) {
+					e.preventDefault();
 				}
+			});
+			
+			// Bypass validation for the Restore All button
+			$('#convert-cart-form').on('submit', function(e) {
+				if (e.originalEvent && e.originalEvent.submitter && e.originalEvent.submitter.name === 'restore_all') {
+					// Don't validate when clicking Restore All
+					return true;
+				}
+			});
+		});
+		</script>
+		<?php
+	}
+
+	/**
+	 * Render Email consent settings page
+	 */
+	public function render_email_consent_page() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'woocommerce_cc_analytics' ) );
+		}
+
+		// Handle restore all defaults
+		if ( isset( $_POST['restore_all'] ) && isset( $_POST['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'cc_email_consent_settings' ) ) {
+			$default_html = $this->get_default_email_consent_html();
+			update_option( 'cc_email_consent_checkout_html', $default_html );
+			update_option( 'cc_email_consent_registration_html', $default_html );
+			update_option( 'cc_email_consent_account_html', $default_html );
+			
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'All Email Consent HTML templates have been restored to defaults.', 'woocommerce_cc_analytics' ) . '</p></div>';
+			
+			// Refresh the values
+			$checkout_html = $default_html;
+			$registration_html = $default_html;
+			$account_html = $default_html;
+		} 
+		// Handle form submission
+		else if ( isset( $_POST['submit'] ) && isset( $_POST['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'cc_email_consent_settings' ) ) {
+			if ( isset( $_POST['cc_email_consent_checkout_html'] ) ) {
+				$checkout_html = $this->sanitize_consent_html( wp_unslash( $_POST['cc_email_consent_checkout_html'] ), false );
+				update_option( 'cc_email_consent_checkout_html', $checkout_html );
+			}
+			if ( isset( $_POST['cc_email_consent_registration_html'] ) ) {
+				$registration_html = $this->sanitize_consent_html( wp_unslash( $_POST['cc_email_consent_registration_html'] ), false );
+				update_option( 'cc_email_consent_registration_html', $registration_html );
+			}
+			if ( isset( $_POST['cc_email_consent_account_html'] ) ) {
+				$account_html = $this->sanitize_consent_html( wp_unslash( $_POST['cc_email_consent_account_html'] ), false );
+				update_option( 'cc_email_consent_account_html', $account_html );
 			}
 			
-			// Add form with nonce field
-			echo '<form method="POST" id="convert-cart-email-form">';
-			wp_nonce_field( 'save_convert_cart_email_html', 'cc_email_nonce' );
-			
-			// Default HTML snippets as fallback
-			$default_checkout_html = '<div class="email-consent-checkbox"><label for="email_consent"><input type="checkbox" name="email_consent" id="email_consent"> I consent to receive email communications.</label></div>';
-
-			$default_registration_html = '<p class="form-row form-row-wide"><label for="email_consent">' . esc_html__( 'I consent to receive email communications', 'woocommerce' ) . '</label><input type="checkbox" name="email_consent" id="email_consent"></p>';
-
-			$default_account_html = '<p class="form-row form-row-wide"><label for="email_consent">' . esc_html__( 'I consent to receive email communications', 'woocommerce' ) . '</label><input type="checkbox" name="email_consent" id="email_consent"></p>';
-
-			// Get the saved HTML snippets or use defaults
-			$checkout_html     = get_option( 'cc_email_consent_checkout_html', $default_checkout_html );
-			$registration_html = get_option( 'cc_email_consent_registration_html', $default_registration_html );
-			$account_html      = get_option( 'cc_email_consent_account_html', $default_account_html );
-
-			?>
-			<div class="wrap">
-				<h1><?php _e( 'Convert Cart Email Consent', 'woocommerce_cc_analytics' ); ?></h1>
-				<h2><?php _e( 'Checkout Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
-				<textarea id="cc_email_consent_checkout_html" name="cc_email_consent_checkout_html" rows="10"
-					cols="50"><?php echo esc_textarea( $checkout_html ); ?></textarea>
-
-				<h2><?php _e( 'Registration Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
-				<textarea id="cc_email_consent_registration_html" name="cc_email_consent_registration_html" rows="10"
-					cols="50"><?php echo esc_textarea( $registration_html ); ?></textarea>
-
-				<h2><?php _e( 'My Account Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
-				<textarea id="cc_email_consent_account_html" name="cc_email_consent_account_html" rows="10"
-					cols="50"><?php echo esc_textarea( $account_html ); ?></textarea>
-
-				<p><input type="submit" name="save_convert_cart_email_html" value="Save Email Consent HTML Snippets" class="button-primary"></p>
-			</div>
-			<?php
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Email Consent settings saved successfully.', 'woocommerce_cc_analytics' ) . '</p></div>';
 		}
+		// Load existing values
+		else {
+			$consent_mode = $this->get_option( 'enable_email_consent', 'disabled' );
+			$checkout_html = get_option( 'cc_email_consent_checkout_html' );
+			$registration_html = get_option( 'cc_email_consent_registration_html' );
+			$account_html = get_option( 'cc_email_consent_account_html' );
+
+			// Set default values if empty
+			if ( empty( $checkout_html ) ) {
+				$checkout_html = $this->get_default_email_consent_html();
+				update_option( 'cc_email_consent_checkout_html', $checkout_html );
+			}
+			if ( empty( $registration_html ) ) {
+				$registration_html = $this->get_default_email_consent_html();
+				update_option( 'cc_email_consent_registration_html', $registration_html );
+			}
+			if ( empty( $account_html ) ) {
+				$account_html = $this->get_default_email_consent_html();
+				update_option( 'cc_email_consent_account_html', $account_html );
+			}
+		}
+
+		// Use inline HTML instead of including a file that might not exist
+		?>
+		<div class="wrap">
+			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
+			
+			<?php if ( isset($consent_mode) && $consent_mode === 'disabled' ) : ?>
+				<div class="notice notice-warning">
+					<p><?php esc_html_e( 'Email Consent collection is currently disabled. Enable it in Convert Cart Analytics settings to customize the consent forms.', 'woocommerce_cc_analytics' ); ?></p>
+				</div>
+			<?php endif; ?>
+
+			<form method="post" id="convert-cart-form">
+				<?php wp_nonce_field( 'cc_email_consent_settings' ); ?>
+				
+				<h2><?php esc_html_e( 'Checkout Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
+				<div class="code-editor-wrapper">
+					<textarea id="cc_email_consent_checkout_html" name="cc_email_consent_checkout_html" rows="5" cols="50" class="large-text code consent-html-editor"><?php echo esc_textarea( $checkout_html ); ?></textarea>
+				</div>
+
+				<h2><?php esc_html_e( 'Registration Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
+				<div class="code-editor-wrapper">
+					<textarea id="cc_email_consent_registration_html" name="cc_email_consent_registration_html" rows="5" cols="50" class="large-text code consent-html-editor"><?php echo esc_textarea( $registration_html ); ?></textarea>
+				</div>
+
+				<h2><?php esc_html_e( 'My Account Page HTML', 'woocommerce_cc_analytics' ); ?></h2>
+				<div class="code-editor-wrapper">
+					<textarea id="cc_email_consent_account_html" name="cc_email_consent_account_html" rows="5" cols="50" class="large-text code consent-html-editor"><?php echo esc_textarea( $account_html ); ?></textarea>
+				</div>
+
+				<div class="submit-buttons" style="display: flex; gap: 10px; margin-top: 20px;">
+					<input type="submit" name="restore_all" id="restore_all_button" value="<?php esc_attr_e('Restore All to Default', 'woocommerce_cc_analytics'); ?>" class="button button-secondary">
+					<?php submit_button( __( 'Save Email Consent Settings', 'woocommerce_cc_analytics' ), 'primary', 'submit', false ); ?>
+				</div>
+			</form>
+		</div>
+		
+		<script>
+		jQuery(document).ready(function($) {
+			// Add confirmation to the Restore All button
+			$('#restore_all_button').on('click', function(e) {
+				if (!confirm('<?php echo esc_js(__('Are you sure you want to restore all HTML templates to default? This cannot be undone.', 'woocommerce_cc_analytics')); ?>')) {
+					e.preventDefault();
+				}
+			});
+			
+			// Bypass validation for the Restore All button
+			$('#convert-cart-form').on('submit', function(e) {
+				if (e.originalEvent && e.originalEvent.submitter && e.originalEvent.submitter.name === 'restore_all') {
+					// Don't validate when clicking Restore All
+					return true;
+				}
+			});
+		});
+		</script>
+		<?php
+	}
+
+	/**
+	 * Sanitize consent HTML while preserving form elements
+	 * 
+	 * @param string $html The HTML to sanitize
+	 * @param bool $is_sms Whether this is SMS consent HTML (true) or Email consent HTML (false)
+	 * @return string Sanitized HTML
+	 */
+	public function sanitize_consent_html($html, $is_sms = true) {
+		if (empty($html)) {
+			return $is_sms ? $this->get_default_sms_consent_html() : $this->get_default_email_consent_html();
+		}
+		
+		// Allow specific HTML tags including input elements with their attributes
+		$allowed_html = array(
+			'div' => array(
+				'class' => true,
+				'id' => true,
+				'style' => true,
+			),
+			'span' => array(
+				'class' => true,
+				'id' => true,
+				'style' => true,
+			),
+			'label' => array(
+				'for' => true,
+				'class' => true,
+				'style' => true,
+			),
+			'input' => array(
+				'type' => true,
+				'name' => true,
+				'id' => true,
+				'class' => true,
+				'value' => true,
+				'checked' => true,
+				'style' => true,
+			),
+			'p' => array(
+				'class' => true,
+				'style' => true,
+			),
+			'br' => array(),
+			'strong' => array(),
+			'em' => array(),
+			'a' => array(
+				'href' => true,
+				'target' => true,
+				'rel' => true,
+				'class' => true,
+			),
+		);
+		
+		// Use wp_kses with our allowed HTML tags
+		$sanitized_html = wp_kses($html, $allowed_html);
+		
+		// Check if the required checkbox exists
+		$checkbox_name = $is_sms ? 'sms_consent' : 'email_consent';
+		if (strpos($sanitized_html, 'name="' . $checkbox_name . '"') === false || 
+			strpos($sanitized_html, 'type="checkbox"') === false) {
+			// If checkbox is missing, return the default HTML
+			return $is_sms ? $this->get_default_sms_consent_html() : $this->get_default_email_consent_html();
+		}
+		
+		return $sanitized_html;
+	}
+
+	/**
+	 * Get default SMS consent HTML
+	 * 
+	 * @return string Default SMS consent HTML
+	 */
+	public function get_default_sms_consent_html() {
+		return '<div class="sms-consent-checkbox form-row">
+			<label for="sms_consent">
+				<input type="checkbox" name="sms_consent" id="sms_consent" />
+				<span>' . esc_html__( 'I consent to receive SMS communications.', 'woocommerce_cc_analytics' ) . '</span>
+			</label>
+		</div>';
+	}
+
+	/**
+	 * Get default Email consent HTML
+	 * 
+	 * @return string Default Email consent HTML
+	 */
+	public function get_default_email_consent_html() {
+		return '<div class="email-consent-checkbox form-row">
+			<label for="email_consent">
+				<input type="checkbox" name="email_consent" id="email_consent" />
+				<span>' . esc_html__( 'I consent to receive email communications.', 'woocommerce_cc_analytics' ) . '</span>
+			</label>
+		</div>';
 	}
 
 	/**
@@ -1348,36 +1571,282 @@ class WC_CC_Analytics extends \WC_Integration {
     }
 
 	/**
-	 * Debug logging helper specific to this integration class.
+	 * Enqueues CodeMirror assets for the Convert Cart settings pages.
 	 *
-	 * @param string $message Message to log.
+	 * @param string $hook_suffix The current admin page.
+	 * @return void
 	 */
-	public function log_debug($message) {
-		if (defined('WP_DEBUG') && WP_DEBUG === true) {
-			if (is_array($message) || is_object($message)) {
-				$message = print_r($message, true);
-			}
-			error_log('Convert Cart Integration: ' . $message);
+	public function enqueue_codemirror_assets($hook_suffix) {
+		// Only load on our consent pages
+		if (strpos($hook_suffix, 'convert-cart-sms-consent') === false && 
+			strpos($hook_suffix, 'convert-cart-email-consent') === false) {
+			return;
 		}
+
+		// Check if code editor is available and user hasn't disabled it
+		$settings = wp_enqueue_code_editor(array(
+			'type' => 'text/html',
+			'codemirror' => array(
+				'lineNumbers' => true,
+				'lineWrapping' => true,
+				'styleActiveLine' => true,
+				'matchBrackets' => true,
+				'autoCloseBrackets' => true,
+				'autoCloseTags' => true,
+				'mode' => 'htmlmixed',
+				'tabSize' => 4,
+				'indentUnit' => 4,
+				'indentWithTabs' => true,
+			),
+		));
+
+		// Bail if user disabled CodeMirror
+		if (false === $settings) {
+			return;
+		}
+
+		wp_enqueue_script('jquery');
+
+		// Load the beautifier library
+		wp_enqueue_script(
+			'js-beautify',
+			'https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-html.min.js',
+			array(),
+			'1.14.9',
+			true
+		);
+
+		// Get default HTML templates for reset functionality
+		$default_sms_html = $this->get_default_sms_consent_html();
+		$default_email_html = $this->get_default_email_consent_html();
+
+		wp_add_inline_script('code-editor', '
+			jQuery(function($) {
+				var editorSettings = ' . wp_json_encode($settings) . ';
+				var beautifyOptions = {
+					indent_size: 4,
+					indent_with_tabs: true,
+					wrap_line_length: 0,
+					preserve_newlines: false,
+					max_preserve_newlines: 2,
+					indent_inner_html: true,
+					wrap_attributes: "auto",
+					wrap_attributes_indent_size: 4,
+					end_with_newline: false,
+					indent_empty_lines: false,
+					unformatted: ["code", "pre"],
+					content_unformatted: ["pre"],
+					extra_liners: [],
+					indent_scripts: "normal"
+				};
+
+				// Default HTML templates for reset functionality
+				var defaultTemplates = {
+					sms_checkout: ' . json_encode($default_sms_html) . ',
+					sms_registration: ' . json_encode($default_sms_html) . ',
+					sms_account: ' . json_encode($default_sms_html) . ',
+					email_checkout: ' . json_encode($default_email_html) . ',
+					email_registration: ' . json_encode($default_email_html) . ',
+					email_account: ' . json_encode($default_email_html) . '
+				};
+
+				editorSettings.codemirror.extraKeys = {
+					"Tab": function(cm) {
+						if (cm.somethingSelected()) {
+							cm.indentSelection("add");
+						} else {
+							cm.replaceSelection(cm.getOption("indentWithTabs") ? "\t" :
+								Array(cm.getOption("indentUnit") + 1).join(" "), "end", "+input");
+						}
+					},
+					"Shift-Tab": "indentLess"
+				};
+
+				$(".consent-html-editor").each(function(i, textarea) {
+					var $textarea = $(textarea);
+					var editorId = $textarea.attr("id");
+					var editorType = "";
+					
+					// Determine editor type for reset functionality
+					if (editorId.indexOf("sms_consent") !== -1) {
+						if (editorId.indexOf("checkout") !== -1) editorType = "sms_checkout";
+						else if (editorId.indexOf("registration") !== -1) editorType = "sms_registration";
+						else if (editorId.indexOf("account") !== -1) editorType = "sms_account";
+					} else if (editorId.indexOf("email_consent") !== -1) {
+						if (editorId.indexOf("checkout") !== -1) editorType = "email_checkout";
+						else if (editorId.indexOf("registration") !== -1) editorType = "email_registration";
+						else if (editorId.indexOf("account") !== -1) editorType = "email_account";
+					}
+
+					// Prevent default tab behavior
+					$textarea.on("keydown", function(e) {
+						if (e.keyCode === 9) { // tab key
+							e.preventDefault();
+						}
+					});
+
+					var editor = wp.codeEditor.initialize($textarea, editorSettings);
+
+					// Set tab handling message
+					var message = $("<p>", {
+						text: "Use Tab key for indentation. Shift+Tab to decrease indent.",
+						class: "description",
+						css: { "margin-top": "5px", "font-style": "italic" }
+					});
+					$textarea.closest(".code-editor-wrapper").prepend(message);
+
+					// Format the initial content
+					var initialContent = editor.codemirror.getValue();
+					if (window.html_beautify && initialContent.trim()) {
+						var formattedContent = window.html_beautify(initialContent, beautifyOptions);
+						editor.codemirror.setValue(formattedContent);
+					}
+
+					editor.codemirror.on("change", function() {
+						$textarea.val(editor.codemirror.getValue());
+					});
+
+					// Create button container for better alignment
+					var buttonContainer = $("<div>", {
+						class: "button-container",
+						css: { 
+							"margin-top": "5px",
+							"display": "flex",
+							"gap": "10px"
+						}
+					});
+
+					// Add format button
+					var formatButton = $("<button>", {
+						text: "Format HTML",
+						class: "button button-secondary",
+						click: function(e) {
+							e.preventDefault();
+							var content = editor.codemirror.getValue();
+							if (window.html_beautify && content.trim()) {
+								var formattedContent = window.html_beautify(content, beautifyOptions);
+								editor.codemirror.setValue(formattedContent);
+							}
+						}
+					});
+					
+					// Add reset button
+					var resetButton = $("<button>", {
+						text: "Reset to Default",
+						class: "button button-secondary",
+						css: { "margin-left": "10px" },
+						click: function(e) {
+							e.preventDefault();
+							if (confirm("Are you sure you want to reset this HTML to the default template? This cannot be undone.")) {
+								if (defaultTemplates[editorType]) {
+									var defaultContent = defaultTemplates[editorType];
+									if (window.html_beautify) {
+										defaultContent = window.html_beautify(defaultContent, beautifyOptions);
+									}
+									editor.codemirror.setValue(defaultContent);
+								}
+							}
+						}
+					});
+					
+					// Add buttons to container
+					buttonContainer.append(formatButton);
+					buttonContainer.append(resetButton);
+					
+					// Add button container to editor wrapper
+					$textarea.closest(".code-editor-wrapper").append(buttonContainer);
+				});
+
+				// Form validation
+				$("#convert-cart-form").on("submit", function(e) {
+					// Skip validation if the Restore All button was clicked
+					if (e.originalEvent && e.originalEvent.submitter && e.originalEvent.submitter.name === "restore_all") {
+						return true;
+					}
+					
+					var isEmailForm = $(this).find("[name^=cc_email_consent]").length > 0;
+					var checkoutHtml = isEmailForm ? 
+						$("#cc_email_consent_checkout_html").val() : 
+						$("#cc_sms_consent_checkout_html").val();
+					var registrationHtml = isEmailForm ? 
+						$("#cc_email_consent_registration_html").val() : 
+						$("#cc_sms_consent_registration_html").val();
+					var accountHtml = isEmailForm ? 
+						$("#cc_email_consent_account_html").val() : 
+						$("#cc_sms_consent_account_html").val();
+					var inputName = isEmailForm ? "email_consent" : "sms_consent";
+
+					// Function to validate HTML structure
+					function isValidHTML(...htmlArgs) {
+						return htmlArgs.every(html => {
+							let doc = document.createElement("div");
+							doc.innerHTML = html.trim();
+							return doc.innerHTML !== ""; // Check if it was parsed correctly
+						});
+					}
+
+					function hasConsentInputBoxWithId(...htmlArgs) {
+						return htmlArgs.every(html => {
+							let doc = document.createElement("div");
+							doc.innerHTML = html.trim();
+							const inputTag = doc.querySelector("input[name=\\"" + inputName + "\\"]");
+							return inputTag && inputTag.id === inputName && inputTag.type === "checkbox";
+						});
+					}
+
+					try {
+						if (!isValidHTML(checkoutHtml, registrationHtml, accountHtml)) {
+							throw new Error("Invalid HTML detected. Please fix the HTML syntax.");
+						}
+
+						if (!hasConsentInputBoxWithId(checkoutHtml, registrationHtml, accountHtml)) {
+							throw new Error("The \\"" + inputName + "\\" checkbox must be present in all HTML snippets.");
+						}
+					} catch (error) {
+						alert(error.message);
+						e.preventDefault(); // Stop form submission
+					}
+				});
+			});
+		');
 	}
 
 	/**
-	 * Check if WooCommerce version is compatible
+	 * Register settings for the consent forms
 	 */
-	public function check_woocommerce_version() {
-		if (!defined('WC_VERSION')) {
-			return false;
-		}
+	public function register_settings() {
+		// Register SMS consent settings
+		register_setting('cc_consent_settings', 'cc_sms_consent_checkout_html', array(
+			'sanitize_callback' => function($input) {
+				return $this->sanitize_consent_html($input, true);
+			},
+		));
+		register_setting('cc_consent_settings', 'cc_sms_consent_registration_html', array(
+			'sanitize_callback' => function($input) {
+				return $this->sanitize_consent_html($input, true);
+			},
+		));
+		register_setting('cc_consent_settings', 'cc_sms_consent_account_html', array(
+			'sanitize_callback' => function($input) {
+				return $this->sanitize_consent_html($input, true);
+			},
+		));
 		
-		if (version_compare(WC_VERSION, '7.0.0', '<')) {
-			add_action('admin_notices', function() {
-				echo '<div class="notice notice-error"><p>' . 
-					esc_html__('Convert Cart Analytics requires WooCommerce 7.0.0 or higher.', 'woocommerce_cc_analytics') . 
-					'</p></div>';
-			});
-			return false;
-		}
-		
-		return true;
+		// Register Email consent settings
+		register_setting('cc_consent_settings', 'cc_email_consent_checkout_html', array(
+			'sanitize_callback' => function($input) {
+				return $this->sanitize_consent_html($input, false);
+			},
+		));
+		register_setting('cc_consent_settings', 'cc_email_consent_registration_html', array(
+			'sanitize_callback' => function($input) {
+				return $this->sanitize_consent_html($input, false);
+			},
+		));
+		register_setting('cc_consent_settings', 'cc_email_consent_account_html', array(
+			'sanitize_callback' => function($input) {
+				return $this->sanitize_consent_html($input, false);
+			},
+		));
 	}
 }
