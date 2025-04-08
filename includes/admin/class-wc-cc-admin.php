@@ -30,13 +30,20 @@ class WC_CC_Admin extends WC_CC_Base {
     /**
      * Constructor.
      *
-     * @param WC_Integration $integration
+     * @param WC_Integration $integration The main WC_CC_Analytics integration instance.
      */
     public function __construct(WC_Integration $integration) {
         parent::__construct($integration);
         $this->menu = new WC_CC_Menu($integration);
-        $this->sms_consent = new WC_CC_SMS_Consent($integration);
-        $this->email_consent = new WC_CC_Email_Consent($integration);
+
+        // Retrieve plugin details from the main integration instance
+        $plugin_url = method_exists($integration, 'get_plugin_url') ? $integration->get_plugin_url() : '';
+        $plugin_path = method_exists($integration, 'get_plugin_path') ? $integration->get_plugin_path() : '';
+        $plugin_version = method_exists($integration, 'get_plugin_version') ? $integration->get_plugin_version() : 'unknown';
+
+        // Instantiate consent classes with all required arguments
+        $this->sms_consent = new WC_CC_SMS_Consent($integration, $plugin_url, $plugin_path, $plugin_version);
+        $this->email_consent = new WC_CC_Email_Consent($integration, $plugin_url, $plugin_path, $plugin_version);
     }
 
     /**
@@ -132,26 +139,18 @@ class WC_CC_Admin extends WC_CC_Base {
             'convertcart-admin',
             plugins_url('assets/js/admin.js', CONVERTCART_PLUGIN_FILE),
             ['jquery', 'wp-util', 'code-editor', 'js-beautify'], // Ensure code-editor and js-beautify are dependencies
-            CONVERTCART_VERSION,
+            defined('CONVERTCART_ANALYTICS_VERSION') ? CONVERTCART_ANALYTICS_VERSION : '1.0.0', // Fallback version
             true // Load in footer
         );
 
-        // Add custom styles for the editor and buttons
-        wp_add_inline_style(
-            'code-editor', // Attach styles to code-editor handle
-            '.CodeMirror {
-                height: 250px; /* Adjust height as needed */
-                border: 1px solid #ddd;
-            }
-            .editor-container {
-                margin-bottom: 20px; /* Space below each editor group */
-            }
-            .button-container {
-                margin-top: 5px; /* Space between editor and buttons */
-                display: flex;
-                gap: 10px; /* Space between buttons */
-            }'
+        // --- ADD Enqueue Admin CSS ---
+        wp_enqueue_style(
+            'convertcart-admin-styles',
+            plugins_url('assets/css/admin.css', CONVERTCART_PLUGIN_FILE),
+            [], // No dependencies for this simple CSS
+            defined('CONVERTCART_ANALYTICS_VERSION') ? CONVERTCART_ANALYTICS_VERSION : '1.0.0'
         );
+        // --- END Enqueue Admin CSS ---
 
         // Pass data to our script
         wp_localize_script('convertcart-admin', 'convertCartAdminData', [

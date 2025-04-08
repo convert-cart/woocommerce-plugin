@@ -19,56 +19,48 @@ class WC_CC_Analytics_Tracking extends WC_CC_Base {
      */
     public function __construct(WC_Integration $integration) {
         parent::__construct($integration);
+        // No init needed here as hooks are added in WC_CC_Analytics::init_hooks
     }
 
     /**
      * Initialize hooks.
+     * This method is called by WC_CC_Analytics::init_hooks if client ID is present.
      */
     public function init(): void {
-        // Get the Client ID from the main integration settings
-        $client_id = $this->integration->get_option('cc_client_id');
-        $client_id_exists = !empty($client_id);
-
-        // Only add tracking hooks if the Client ID exists
-        if ($client_id_exists) {
-            // Add hook for the main script in the head
-            add_action('wp_head', [$this, 'add_tracking_code']);
-
-            // Add hook for order tracking on thank you page
-            add_action('woocommerce_thankyou', [$this, 'track_order']);
-
-        }
+        add_action('wp_head', [$this, 'add_tracking_script']);
+        add_action('woocommerce_thankyou', [$this, 'track_order']);
+        // Note: Other page-specific events (product, cart, etc.) are handled by Event_Manager via wp_footer
     }
 
     /**
-     * Add tracking code to head.
+     * Add ConvertCart base tracking script to head.
      */
-    public function add_tracking_code(): void {
-        $client_id = $this->integration->get_option('cc_client_id');
+    public function add_tracking_script(): void {
+        $client_id = $this->get_option('cc_client_id');
         if (empty($client_id)) {
+            // Client ID check is done before init() is called, but double-check just in case.
             return;
         }
-
-        // Outputs the main ConvertCart JS library loader
         ?>
-        <script type="text/javascript">
-            (function(c,o,v,e,r,t){
-                c[r]=c[r]||function(){(c[r].q=c[r].q||[]).push(arguments)};
-                t=o.createElement(v);t.async=1;t.src=e;o.head.appendChild(t);
-            })(window,document,'script','https://cdn.convertcart.com/<?php echo esc_js($client_id); ?>.js','cc');
+        <!-- ConvertCart Analytics -->
+        <script>
+            (function(c,o,n,v,e,r,t){
+                c[e]=c[e]||function(){(c[e].q=c[e].q||[]).push(arguments)};
+                r=o.createElement(n);r.async=1;r.src=v;
+                t=o.getElementsByTagName(n)[0];t.parentNode.insertBefore(r,t);
+            })(window,document,'script','https://tracker.convertcart.com/v1/tracker.js','_cc');
+            _cc('init', '<?php echo esc_js($client_id); ?>');
         </script>
+        <!-- /ConvertCart Analytics -->
         <?php
     }
 
     /**
-     * Add events script to footer.
-     * NOTE: This method is likely no longer called as the hook was removed in init().
-     * Kept for potential future use or direct calls if needed.
+     * Placeholder for potential future event additions via this class.
+     * Currently, page view events are handled by Event_Manager.
      */
     public function add_events(): void {
-        // --- Original Code Start (Commented out) ---
-        // try { ... } catch { ... }
-        // --- Original Code End ---
+        // Currently unused as Event_Manager handles page view events.
     }
 
     /**
@@ -90,10 +82,8 @@ class WC_CC_Analytics_Tracking extends WC_CC_Base {
             $event_data = $this->get_order_event_data($order);
             $this->output_tracking_script('orderCompleted', $event_data);
         } catch (Exception $e) {
-            // Log critical errors if necessary, otherwise remove for production
-            // error_log("ConvertCart ERROR: Failed to track order {$order_id}: " . $e->getMessage());
-            // OR keep the $this->log_error call if that method handles production logging appropriately.
-            // $this->log_error("Failed to track order {$order_id}: " . $e->getMessage());
+            // Log critical errors during order tracking
+             $this->log_error("Failed to track order {$order_id}: " . $e->getMessage());
         }
     }
 
@@ -199,19 +189,22 @@ class WC_CC_Analytics_Tracking extends WC_CC_Base {
             }
 
             $item_data = [
+                'productId' => (string)$product->get_id(),
                 'name' => $product->get_name(),
-                'price' => $product->get_price(),
-                'currency' => $order->get_currency(),
+                'price' => $item->get_total() / $item->get_quantity(), // Price per unit
                 'quantity' => $item->get_quantity(),
                 'url' => get_permalink($product->get_id()),
             ];
 
-            if ($product->get_image_id()) {
-                $image_url = wp_get_attachment_image_url($product->get_image_id(), 'full');
+            // Add image
+            $image_id = $product->get_image_id();
+            if ($image_id) {
+                $image_url = wp_get_attachment_image_url($image_id, 'full');
                 if ($image_url) {
                     $item_data['image'] = $image_url;
                 }
             }
+            // END Add image
 
             $event_data['items'][] = $item_data;
         }

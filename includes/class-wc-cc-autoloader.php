@@ -58,13 +58,8 @@ class WC_CC_Autoloader {
             return;
         }
 
-        // Remove the root namespace
         $relative_class = substr($class, strlen(__NAMESPACE__ . '\\'));
-
-        // Convert namespace separators to directory separators
         $relative_path = str_replace('\\', DIRECTORY_SEPARATOR, $relative_class);
-
-        // Get the file name
         $class_name = basename($relative_path);
         $file_name = $this->get_file_name_from_class($class_name);
 
@@ -72,12 +67,10 @@ class WC_CC_Autoloader {
         $path = $this->include_path;
         $dir_path = dirname($relative_path);
         if ($dir_path !== '.') {
-            $path .= DIRECTORY_SEPARATOR . strtolower($dir_path); // Ensure subdirectories are lowercase
+            $path .= DIRECTORY_SEPARATOR . strtolower($dir_path); // Subdirectories are lowercase
         }
-
         $full_path = $path . DIRECTORY_SEPARATOR . $file_name;
 
-        // Try to load the file
         $this->load_file($full_path);
     }
 } 

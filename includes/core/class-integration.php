@@ -28,11 +28,8 @@ class Integration {
 	 * Init and hook in the integration.
 	 */
 	public function __construct() {
-		// Remove any code here that relies on being a WC_Integration
-		// e.g., setting $this->id, $this->method_title, etc.
-		// Keep the component initialization for now if needed elsewhere,
-		// but ideally, this logic should move to WC_CC_Analytics.
-		// $this->init_components(); // Comment this out for now to prevent early consent instantiation
+		// Constructor logic (if any specific to this class) would go here.
+		// Initialization of components and hooks is handled by WC_CC_Analytics.
 	}
 
 	/**
@@ -51,15 +48,8 @@ class Integration {
 	 * Initialize plugin components.
 	 */
 	public function init_components() {
-		// Remove debug log
-		// error_log('Core\Integration init_components called.');
-		// Comment out the instantiation here
-		// if (class_exists('\ConvertCart\Analytics\Consent\SMS_Consent')) {
-		//     new \ConvertCart\Analytics\Consent\SMS_Consent($this);
-		// }
-		// if (class_exists('\ConvertCart\Analytics\Consent\Email_Consent')) {
-		//     new \ConvertCart\Analytics\Consent\Email_Consent($this);
-		// }
+		// This method might be deprecated or refactored if component
+		// instantiation is fully handled by WC_CC_Analytics.
 	}
 
 	/**
@@ -843,8 +833,7 @@ class Integration {
 		<?php
 	}
 
-	// Add a basic log_debug method if Base_Consent expects it,
-	// although Base_Consent should now use the one from WC_CC_Analytics
+	// Fallback debug logger (consider removing if Base_Consent uses WC_CC_Analytics logger)
 	public function log_debug($message) {
 		if (defined('WP_DEBUG') && WP_DEBUG) {
 			error_log('Core Integration Debug (Fallback): ' . $message);
