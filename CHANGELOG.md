@@ -2,10 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.3.3] - 2025-03-24
+## [1.4.0] - 2025-03-24
 ### Fixed
 - Removed deprecated WooCommerce functions and replaced with latest functions.
 - Fixes for HPOS compatibility.
+- Plugin restructured for better organization.
 
 ## [1.3.2] - 2025-03-07
 ### Added
