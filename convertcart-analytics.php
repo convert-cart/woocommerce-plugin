@@ -18,9 +18,14 @@
 
 defined('ABSPATH') || exit;
 
-define('CONVERTCART_VERSION', '1.0.0');
-define('CONVERTCART_PLUGIN_FILE', __FILE__);
-define('CONVERTCART_PLUGIN_PATH', plugin_dir_path(__FILE__));
+// Define constants (Ensure these are correct)
+define('CONVERTCART_ANALYTICS_VERSION', '1.0.0'); // Or your actual version
+define('CONVERTCART_ANALYTICS_PATH', plugin_dir_path(__FILE__));
+define('CONVERTCART_ANALYTICS_URL', plugin_dir_url(__FILE__));
+
+// Add logs to confirm definition
+error_log("ConvertCart Debug (Plugin File Top Level): CONVERTCART_ANALYTICS_PATH defined as: " . CONVERTCART_ANALYTICS_PATH);
+error_log("ConvertCart Debug (Plugin File Top Level): CONVERTCART_ANALYTICS_URL defined as: " . CONVERTCART_ANALYTICS_URL);
 
 // Check if WooCommerce is active
 if (!in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_option('active_plugins')))) {
@@ -35,11 +40,11 @@ add_action('before_woocommerce_init', function() {
 });
 
 // Autoloader
-require_once dirname(__FILE__) . '/includes/class-wc-cc-autoloader.php';
+require_once CONVERTCART_ANALYTICS_PATH . 'includes/class-wc-cc-autoloader.php';
 new \ConvertCart\Analytics\WC_CC_Autoloader();
 
 // Debug code
-$admin_file = dirname(__FILE__) . '/includes/admin/class-wc-cc-admin.php';
+$admin_file = CONVERTCART_ANALYTICS_PATH . 'includes/admin/class-wc-cc-admin.php';
 error_log("ConvertCart Debug: Admin file exists: " . (file_exists($admin_file) ? 'yes' : 'no'));
 error_log("ConvertCart Debug: Admin file path: " . $admin_file);
 

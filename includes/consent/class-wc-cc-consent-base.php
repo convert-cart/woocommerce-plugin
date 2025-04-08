@@ -20,32 +20,79 @@ abstract class WC_CC_Consent_Base extends WC_CC_Base {
      */
     protected string $consent_mode_option;
 
+    /** @var string Plugin base URL. */
+    protected string $plugin_url;
+
+    /** @var string Plugin base path. */
+    protected string $plugin_path;
+
+    /** @var string Plugin version. */
+    protected string $plugin_version;
+
     /**
      * Constructor.
      *
      * @param WC_Integration $integration Parent integration instance
      * @param string $consent_type Type of consent (sms or email)
+     * @param string $plugin_url Base URL of the plugin
+     * @param string $plugin_path Base path of the plugin
+     * @param string $plugin_version Plugin version
      */
-    public function __construct(WC_Integration $integration, string $consent_type) {
+    public function __construct(
+        WC_Integration $integration,
+        string $consent_type,
+        string $plugin_url,
+        string $plugin_path,
+        string $plugin_version
+    ) {
         parent::__construct($integration);
         $this->consent_type = $consent_type;
         $this->consent_mode_option = "enable_{$consent_type}_consent";
+
+        // Store passed values
+        $this->plugin_url = $plugin_url;
+        $this->plugin_path = $plugin_path;
+        $this->plugin_version = $plugin_version;
+
+        // Log stored values
+        error_log("ConvertCart Debug (Consent Base - {$consent_type}): Constructor received URL: {$this->plugin_url}, Path: {$this->plugin_path}, Version: {$this->plugin_version}");
     }
 
     /**
      * Initialize hooks.
      */
     public function init(): void {
-        // Add consent checkboxes
-        add_action('woocommerce_review_order_before_submit', [$this, 'add_consent_checkbox']);
-        add_action('woocommerce_register_form', [$this, 'add_consent_to_registration_form']);
-        add_action('woocommerce_edit_account_form', [$this, 'add_consent_checkbox_to_account_page']);
+        error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): Base init() called.");
 
-        // Save consent
+        // *** REMOVED Redundant Checkout Hook ***
+        // The 'woocommerce_review_order_before_submit' hook is now handled
+        // by the child classes (SMS/Email) for block/classic logic.
+        // add_action('woocommerce_review_order_before_submit', [$this, 'add_consent_checkbox']);
+        // error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): Removed redundant hook 'woocommerce_review_order_before_submit' from Base init().");
+
+        // Hooks for Registration and Account pages
+        add_action('woocommerce_register_form', [$this, 'add_consent_to_registration_form']);
+        error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): Added hook 'woocommerce_register_form' -> add_consent_to_registration_form.");
+
+        add_action('woocommerce_edit_account_form', [$this, 'add_consent_checkbox_to_account_page']);
+        error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): Added hook 'woocommerce_edit_account_form' -> add_consent_checkbox_to_account_page.");
+
+
+        // Save consent hooks
         add_action('woocommerce_checkout_create_order', [$this, 'save_consent_to_order_or_customer'], 10, 2);
+        error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): Added hook 'woocommerce_checkout_create_order' -> save_consent_to_order_or_customer.");
+
         add_action('woocommerce_created_customer', [$this, 'save_consent_from_registration_form'], 10, 1);
+         error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): Added hook 'woocommerce_created_customer' -> save_consent_from_registration_form.");
+
         add_action('woocommerce_save_account_details', [$this, 'save_consent_from_account_page'], 12, 1);
+         error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): Added hook 'woocommerce_save_account_details' -> save_consent_from_account_page.");
+
+        // This hook might be redundant if checkout/registration covers account creation scenarios
         add_action('woocommerce_created_customer', [$this, 'save_consent_when_account_is_created'], 10, 3);
+         error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): Added hook 'woocommerce_created_customer' -> save_consent_when_account_is_created.");
+
+         error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): Base init() finished.");
     }
 
     /**
@@ -58,12 +105,16 @@ abstract class WC_CC_Consent_Base extends WC_CC_Base {
     }
 
     /**
-     * Check if consent is enabled.
+     * Check if consent functionality should be active (Live or Draft mode).
      *
      * @return bool
      */
     protected function is_consent_enabled(): bool {
-        return $this->get_consent_mode() === 'live';
+        $mode = $this->get_consent_mode();
+        // *** FIX: Allow 'live' OR 'draft' mode ***
+        $enabled = ($mode === 'live' || $mode === 'draft');
+        error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): is_consent_enabled() check. Mode: {$mode}. Enabled: " . ($enabled ? 'Yes' : 'No'));
+        return $enabled;
     }
 
     /**
@@ -94,94 +145,83 @@ abstract class WC_CC_Consent_Base extends WC_CC_Base {
     }
 
     /**
-     * Add consent checkbox.
+     * Add consent checkbox. (DEPRECATED for checkout hook)
+     * This method might still be called if something else hooks into it, but it's
+     * no longer the primary way the checkout checkbox is added by this plugin.
      */
     public function add_consent_checkbox(): void {
-        if (!$this->is_consent_enabled()) {
-            return;
-        }
-
-        echo wp_kses_post($this->get_consent_html('checkout'));
+        error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_checkbox() called (DEPRECATED for checkout hook). Is Checkout: " . (is_checkout() ? 'Yes' : 'No'));
+        // Original logic commented out as it's handled by child classes now.
+        // if (!$this->is_consent_enabled() || !is_checkout()) {
+        //     return;
+        // }
+        // echo wp_kses_post($this->get_consent_html_for_context('checkout'));
     }
 
     /**
      * Add consent to registration form.
      */
     public function add_consent_to_registration_form(): void {
+        // *** ADD LOGS ***
+        error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_to_registration_form() hook fired.");
         if (!$this->is_consent_enabled()) {
+            error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_to_registration_form() - Bailing (Consent not enabled/live/draft).");
             return;
         }
         $html = $this->get_consent_html_for_context('registration');
-        // Add this log
-        error_log("ConvertCart Debug ({$this->consent_type}): Registration form HTML being generated: " . $html);
-        // We echo directly, assuming the saved HTML is sanitized.
-        // Filters on 'woocommerce_register_form' could still interfere.
-        echo $html;
+        error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_to_registration_form() - Retrieved HTML (empty: " . (empty($html) ? 'Yes' : 'No') . ")");
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML is retrieved via get_consent_html_for_context which should handle sanitization or use defaults.
+        echo $html; // Output the HTML (already logged inside get_consent_html_for_context)
+        error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_to_registration_form() - Outputted HTML.");
     }
 
     /**
      * Add consent checkbox to account page, reflecting current user status.
      */
     public function add_consent_checkbox_to_account_page(): void {
+        // *** ADD LOGS ***
+        error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_checkbox_to_account_page() hook fired.");
         if (!$this->is_consent_enabled()) {
+             error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_checkbox_to_account_page() - Bailing (Consent not enabled/live/draft).");
             return;
         }
 
         $user_id = get_current_user_id();
         if ($user_id <= 0) {
-            // Should not happen on account page, but good practice
+             error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_checkbox_to_account_page() - Bailing (No user ID).");
             return;
         }
 
         // Get the base HTML template for the account context
         $html = $this->get_consent_html_for_context('account');
-        error_log("ConvertCart Debug ({$this->consent_type}): Base account page HTML retrieved: " . $html);
+        error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_checkbox_to_account_page() - Retrieved base HTML (empty: " . (empty($html) ? 'Yes' : 'No') . ")");
 
         // Get the user's current consent status
         $current_consent = get_user_meta($user_id, "{$this->consent_type}_consent", true);
-        error_log("ConvertCart Debug ({$this->consent_type}): Current consent for user {$user_id} is: '{$current_consent}'.");
+        $is_checked = ($current_consent === 'yes');
+        error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_checkbox_to_account_page() - User ID: {$user_id}, Current Consent: '{$current_consent}', Is Checked: " . ($is_checked ? 'Yes' : 'No'));
 
-        // If user has consented, add the 'checked' attribute to the input tag
-        if ($current_consent === 'yes') {
-            // Find the input tag - simple string replacement is often sufficient here,
-            // but can be fragile if the HTML structure is complex or varies wildly.
-            // This assumes a standard <input ... name="{$this->consent_type}_consent" ... > structure.
-            $input_name_attr = 'name="' . $this->consent_type . '_consent"';
-            $input_tag_pos = strpos($html, $input_name_attr);
 
-            if ($input_tag_pos !== false) {
-                // Find the closing '>' of the input tag starting from the name attribute position
-                $input_tag_end_pos = strpos($html, '>', $input_tag_pos);
-                if ($input_tag_end_pos !== false) {
-                    // Check if it's a self-closing tag '/>' or just '>'
-                    $tag_ending = '>';
-                    if (substr($html, $input_tag_end_pos - 1, 1) === '/') {
-                        $tag_ending = '/>';
-                        $insertion_point = $input_tag_end_pos - 1;
-                    } else {
-                        $insertion_point = $input_tag_end_pos;
-                    }
-                    // Insert checked='checked' just before the closing bracket/slash
-                    // Avoid adding if already present (unlikely but possible)
-                    if (strpos(substr($html, 0, $insertion_point), 'checked=') === false) {
-                         $html = substr_replace($html, ' checked="checked" ', $insertion_point, 0);
-                         error_log("ConvertCart Debug ({$this->consent_type}): Added 'checked' attribute to account page HTML.");
-                    } else {
-                         error_log("ConvertCart Debug ({$this->consent_type}): 'checked' attribute already present in account page HTML.");
-                    }
-                } else {
-                     error_log("ConvertCart Debug ({$this->consent_type}): Could not find closing '>' for input tag in account HTML.");
-                }
+        // Modify the HTML to set the 'checked' attribute if needed
+        // This is a bit fragile; assumes a standard input structure.
+        if ($is_checked) {
+            // Find the input tag and add 'checked="checked"'
+            // Ensure we don't add it twice if it's already there in the template
+            if (strpos($html, 'checked=') === false) {
+                 $html = preg_replace('/<input([^>]*type=["\']checkbox["\'][^>]*)>/i', '<input$1 checked="checked">', $html, 1);
+                 error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_checkbox_to_account_page() - Added 'checked' attribute.");
             } else {
-                 error_log("ConvertCart Debug ({$this->consent_type}): Could not find input tag with {$input_name_attr} in account HTML.");
+                 error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_checkbox_to_account_page() - 'checked' attribute already present in template.");
             }
+        } else {
+            // Ensure 'checked' attribute is NOT present if consent is 'no' or empty
+             $html = preg_replace('/<input([^>]*?)(\schecked(=["\']checked["\'])?)([^>]*?)>/i', '<input$1$4>', $html, 1);
+             error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_checkbox_to_account_page() - Ensured 'checked' attribute is removed.");
         }
 
-        // Log the final HTML before echoing
-        error_log("ConvertCart Debug ({$this->consent_type}): Final account page HTML being generated: " . $html);
-
-        // Echo the potentially modified HTML
-        echo $html; // Assuming HTML from get_consent_html_for_context is safe enough here
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML is modified but based on trusted source or default. preg_replace is used carefully.
+        echo $html; // Output the potentially modified HTML
+        error_log("ConvertCart Debug (Consent Base - {$this->consent_type}): add_consent_checkbox_to_account_page() - Outputted HTML.");
     }
 
     /**
@@ -355,5 +395,36 @@ abstract class WC_CC_Consent_Base extends WC_CC_Base {
         error_log("ConvertCart Debug ({$this->consent_type}): Using custom HTML for context '{$context}' (option '{$option_name}').");
         // Return the custom HTML fetched from options
         return $custom_html;
+    }
+
+    /**
+     * Check if the current checkout page is using WooCommerce Blocks.
+     * Note: This detection might need refinement as WooCommerce evolves.
+     *
+     * @return bool True if Blocks checkout is detected, false otherwise.
+     */
+    protected function is_blocks_checkout(): bool {
+        // Check 1: If the specific checkout block is rendered on the page
+        if (function_exists('has_block') && has_block('woocommerce/checkout')) {
+             error_log("ConvertCart Debug (Consent Base): is_blocks_checkout() - Detected 'woocommerce/checkout' block.");
+            return true;
+        }
+
+        // Check 2: Look for body classes specific to block checkout themes/pages
+        // This is less reliable as classes can change
+        // $body_classes = get_body_class();
+        // if (in_array('is-block-theme', $body_classes) && is_checkout()) {
+        //     error_log("ConvertCart Debug (Consent Base): is_blocks_checkout() - Detected block theme on checkout.");
+        //     return true;
+        // }
+
+        // Check 3: Check if the block checkout script is enqueued (might run too late)
+        // if (wp_script_is('wc-blocks-checkout', 'enqueued')) {
+        //     error_log("ConvertCart Debug (Consent Base): is_blocks_checkout() - Detected 'wc-blocks-checkout' script.");
+        //     return true;
+        // }
+
+         error_log("ConvertCart Debug (Consent Base): is_blocks_checkout() - No definitive block checkout detected, assuming Classic.");
+        return false; // Default to classic if no block indicators found
     }
 } 

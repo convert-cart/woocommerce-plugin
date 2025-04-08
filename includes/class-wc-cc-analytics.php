@@ -48,12 +48,33 @@ class WC_CC_Analytics extends WC_Integration {
      */
     private ?Event_Manager $event_manager = null;
 
+    /** @var string Plugin base URL. */
+    private string $plugin_url;
+
+    /** @var string Plugin base path. */
+    private string $plugin_path;
+
+    /** @var string Plugin version. */
+    private string $plugin_version;
+
     /**
      * Initialize the integration.
      */
     public function __construct() {
-        // *** ADD LOG HERE - VERY FIRST LINE ***
         error_log("ConvertCart Debug (Main Integration): CONSTRUCTOR START");
+
+        // *** Store constants in properties ***
+        // Ensure constants are defined globally before this runs
+        $this->plugin_url = defined('CONVERTCART_ANALYTICS_URL') ? CONVERTCART_ANALYTICS_URL : '';
+        $this->plugin_path = defined('CONVERTCART_ANALYTICS_PATH') ? CONVERTCART_ANALYTICS_PATH : '';
+        $this->plugin_version = defined('CONVERTCART_ANALYTICS_VERSION') ? CONVERTCART_ANALYTICS_VERSION : '1.0.0'; // Default version
+
+        if (empty($this->plugin_url) || empty($this->plugin_path)) {
+             error_log("ConvertCart Debug (Main Integration): WARNING - CONVERTCART_ANALYTICS_URL or _PATH constants not defined!");
+        } else {
+             error_log("ConvertCart Debug (Main Integration): Stored Plugin URL: " . $this->plugin_url);
+             error_log("ConvertCart Debug (Main Integration): Stored Plugin Path: " . $this->plugin_path);
+        }
 
         global $woocommerce;
         
@@ -62,18 +83,18 @@ class WC_CC_Analytics extends WC_Integration {
         $this->method_description = __('Contact Convert Cart To Get Client ID / Domain Id', 'woocommerce_cc_analytics');
 
         // Initialize components
-        error_log("ConvertCart Debug (Main Integration): Constructor - Before init_components()"); // Log before call
+        error_log("ConvertCart Debug (Main Integration): Constructor - Before init_components()");
         $this->init_components();
-        error_log("ConvertCart Debug (Main Integration): Constructor - After init_components()"); // Log after call
+        error_log("ConvertCart Debug (Main Integration): Constructor - After init_components()");
 
         // Load settings
         $this->init_form_fields();
         $this->init_settings();
 
         // Hook into actions and filters
-        error_log("ConvertCart Debug (Main Integration): Constructor - Before init_hooks()"); // Log before call
+        error_log("ConvertCart Debug (Main Integration): Constructor - Before init_hooks()");
         $this->init_hooks();
-        error_log("ConvertCart Debug (Main Integration): Constructor - After init_hooks()"); // Log after call
+        error_log("ConvertCart Debug (Main Integration): Constructor - After init_hooks()");
 
         // Log that the main integration class is constructed
         error_log("ConvertCart Debug (Main Integration): __construct finished for {$this->id}.");
@@ -83,32 +104,27 @@ class WC_CC_Analytics extends WC_Integration {
      * Initialize plugin components.
      */
     private function init_components(): void {
-        // *** ADD LOG HERE - VERY FIRST LINE ***
         error_log("ConvertCart Debug (Main Integration): INIT_COMPONENTS START");
 
         // Example: Initialize Admin
         if (is_admin()) {
             error_log("ConvertCart Debug (Main Integration): init_components - Initializing Admin...");
             $this->admin = new WC_CC_Admin($this);
-            // $this->admin->init(); // Let's move all ->init() calls to init_hooks for consistency
             error_log("ConvertCart Debug (Main Integration): Admin initialized.");
         }
 
         // Example: Initialize Consent Modules
         error_log("ConvertCart Debug (Main Integration): init_components - Initializing SMS Consent...");
-        $this->sms_consent = new WC_CC_SMS_Consent($this);
-        // $this->sms_consent->init(); // Move to init_hooks
+        $this->sms_consent = new WC_CC_SMS_Consent($this, $this->plugin_url, $this->plugin_path, $this->plugin_version);
         error_log("ConvertCart Debug (Main Integration): SMS Consent initialized.");
 
         error_log("ConvertCart Debug (Main Integration): init_components - Initializing Email Consent...");
-        $this->email_consent = new WC_CC_Email_Consent($this);
-        // $this->email_consent->init(); // Move to init_hooks
+        $this->email_consent = new WC_CC_Email_Consent($this, $this->plugin_url, $this->plugin_path, $this->plugin_version);
         error_log("ConvertCart Debug (Main Integration): Email Consent initialized.");
 
         // Example: Initialize Tracking
         error_log("ConvertCart Debug (Main Integration): init_components - Initializing Tracking...");
         $this->tracking = new WC_CC_Analytics_Tracking($this);
-        // $this->tracking->init(); // Move to init_hooks
         error_log("ConvertCart Debug (Main Integration): Tracking initialized.");
 
         // *** Add Event Manager Initialization HERE ***
@@ -134,8 +150,7 @@ class WC_CC_Analytics extends WC_Integration {
      * This is where component hooks should be added, AFTER components are instantiated.
      */
     private function init_hooks(): void {
-         // *** ADD LOG HERE - VERY FIRST LINE ***
-        error_log("ConvertCart Debug (Main Integration): INIT_HOOKS START");
+         error_log("ConvertCart Debug (Main Integration): INIT_HOOKS START");
 
         // Hook for saving settings
         add_action('woocommerce_update_options_integration_' . $this->id, [$this, 'process_admin_options']);
@@ -218,5 +233,18 @@ class WC_CC_Analytics extends WC_Integration {
                 'description' => __('Control email consent collection functionality.', 'woocommerce_cc_analytics'),
             ],
         ];
+    }
+
+    // *** Add getters if needed elsewhere, though direct passing is preferred ***
+    public function get_plugin_url(): string {
+        return $this->plugin_url;
+    }
+
+    public function get_plugin_path(): string {
+        return $this->plugin_path;
+    }
+
+     public function get_plugin_version(): string {
+        return $this->plugin_version;
     }
 }
