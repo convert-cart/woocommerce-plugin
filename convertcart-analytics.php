@@ -23,10 +23,6 @@ define('CONVERTCART_ANALYTICS_VERSION', '1.0.0'); // Or your actual version
 define('CONVERTCART_ANALYTICS_PATH', plugin_dir_path(__FILE__));
 define('CONVERTCART_ANALYTICS_URL', plugin_dir_url(__FILE__));
 
-// Add logs to confirm definition
-error_log("ConvertCart Debug (Plugin File Top Level): CONVERTCART_ANALYTICS_PATH defined as: " . CONVERTCART_ANALYTICS_PATH);
-error_log("ConvertCart Debug (Plugin File Top Level): CONVERTCART_ANALYTICS_URL defined as: " . CONVERTCART_ANALYTICS_URL);
-
 // Check if WooCommerce is active
 if (!in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_option('active_plugins')))) {
     return;
@@ -43,11 +39,6 @@ add_action('before_woocommerce_init', function() {
 require_once CONVERTCART_ANALYTICS_PATH . 'includes/class-wc-cc-autoloader.php';
 new \ConvertCart\Analytics\WC_CC_Autoloader();
 
-// Debug code
-$admin_file = CONVERTCART_ANALYTICS_PATH . 'includes/admin/class-wc-cc-admin.php';
-error_log("ConvertCart Debug: Admin file exists: " . (file_exists($admin_file) ? 'yes' : 'no'));
-error_log("ConvertCart Debug: Admin file path: " . $admin_file);
-
 /**
  * Add the integration to WooCommerce.
  *
@@ -55,13 +46,11 @@ error_log("ConvertCart Debug: Admin file path: " . $admin_file);
  * @return array
  */
 function wc_cc_analytics_add_integration(array $integrations): array {
-    error_log("ConvertCart Debug (Plugin File): convertcart_analytics_add_integration filter hook fired.");
-
     if (class_exists('ConvertCart\\Analytics\\WC_CC_Analytics')) {
         $integrations[] = 'ConvertCart\\Analytics\\WC_CC_Analytics';
-        error_log("ConvertCart Debug (Plugin File): Added ConvertCart\\Analytics\\WC_CC_Analytics to integrations.");
     } else {
-        error_log("ConvertCart Debug (Plugin File): ERROR - Class ConvertCart\\Analytics\\WC_CC_Analytics not found!");
+        // Keep this critical error log
+        error_log("ConvertCart ERROR: Analytics integration class not found!");
     }
     return $integrations;
 }
@@ -70,12 +59,10 @@ add_filter('woocommerce_integrations', 'wc_cc_analytics_add_integration');
 // Initialize the plugin
 add_action('plugins_loaded', function() {
     load_plugin_textdomain('woocommerce_cc_analytics', false, dirname(plugin_basename(__FILE__)) . '/languages/');
-    error_log("ConvertCart Debug (Plugin File): convertcart_analytics_init action hook fired.");
 
     if (!class_exists('WooCommerce')) {
-        error_log("ConvertCart Debug (Plugin File): WooCommerce not active, ConvertCart Analytics plugin not fully loaded.");
+        // Keep this important dependency log
+        error_log("ConvertCart ERROR: WooCommerce not active - plugin disabled.");
         return;
     }
-
-    add_filter('woocommerce_integrations', 'wc_cc_analytics_add_integration');
 }); 

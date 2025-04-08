@@ -104,24 +104,16 @@ class WC_CC_Admin extends WC_CC_Base {
      */
     public function enqueue_assets(): void {
         $screen = get_current_screen();
-        error_log('ConvertCart Admin: enqueue_assets called. Screen ID: ' . ($screen ? $screen->id : 'null'));
 
         if (!$screen || !$this->is_plugin_page($screen->id)) {
-            if ($screen) {
-                error_log('ConvertCart Admin: enqueue_assets - Screen ID [' . $screen->id . '] is not a target plugin page. Bailing.');
-            } else {
-                 error_log('ConvertCart Admin: enqueue_assets - Could not get screen object. Bailing.');
-            }
             return;
         }
-        error_log('ConvertCart Admin: enqueue_assets - Screen ID [' . $screen->id . '] is a target page. Proceeding with enqueue.');
 
         // Enqueue WordPress code editor assets
         $editor_settings = wp_enqueue_code_editor(['type' => 'text/html']);
 
         // Bail if code editor assets were not enqueued successfully.
         if (false === $editor_settings) {
-            // Add a notice maybe?
             error_log('ConvertCart Admin: Failed to enqueue code editor assets.');
             return;
         }
@@ -196,8 +188,6 @@ class WC_CC_Admin extends WC_CC_Base {
             // You might also want to include the main integration settings page if applicable
             // 'woocommerce_page_wc-settings', // Example if scripts needed on WC settings > Integration tab
         ];
-
-        error_log('ConvertCart Admin: Checking screen ID [' . $screen_id . '] against expected IDs: ' . implode(', ', $expected_screen_ids)); // Add log for debugging
 
         return in_array($screen_id, $expected_screen_ids, true);
     }

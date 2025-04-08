@@ -1,151 +1,92 @@
 /* global convertCartAdminData, wp, CodeMirror, html_beautify */
-// Simple test script
-console.log('ConvertCart Admin JS: File Loaded (Top Level)');
 
 jQuery(document).ready(function($) {
-    console.log('ConvertCart Admin JS: Document Ready');
 
     // Check if the textarea element exists
-    if (jQuery('.consent-html-editor').length > 0) {
-        console.log('ConvertCart Admin JS: Found .consent-html-editor elements.');
-    } else {
-        console.warn('ConvertCart Admin JS: Did not find any .consent-html-editor elements.');
+    if (jQuery('.consent-html-editor').length === 0) {
+        return; // Stop if editors aren't present
     }
 
     // Basic check for localized data
-    if (typeof convertCartAdminData !== 'undefined') {
-         console.log('ConvertCart Admin JS: convertCartAdminData IS defined.');
-    } else {
-         console.error('ConvertCart Admin JS: convertCartAdminData IS NOT defined.');
+    if (typeof convertCartAdminData === 'undefined') {
+         return;
     }
 
      // Basic check for wp.codeEditor
-    if (typeof wp !== 'undefined' && typeof wp.codeEditor !== 'undefined') {
-         console.log('ConvertCart Admin JS: wp.codeEditor IS defined.');
-    } else {
-         console.error('ConvertCart Admin JS: wp.codeEditor IS NOT defined.');
-    }
-
-     // Basic check for html_beautify
-    if (typeof html_beautify === 'function') {
-         console.log('ConvertCart Admin JS: html_beautify IS defined.');
-    } else {
-         console.warn('ConvertCart Admin JS: html_beautify IS NOT defined (may load later).');
-    }
-
-    // --- Initial Checks ---
     if (typeof wp === 'undefined' || typeof wp.codeEditor === 'undefined') {
-        console.error('ConvertCart Admin: wp.codeEditor is not available.');
-        return;
+         return;
     }
-    if (typeof convertCartAdminData === 'undefined') {
-        console.error('ConvertCart Admin: Localized data (convertCartAdminData) is missing.');
-        return;
-    }
-    if (typeof CodeMirror === 'undefined') {
-        // This might happen if wp.codeEditor fails internally
-        console.error('ConvertCart Admin: CodeMirror global object is not available.');
-    }
-    // Check specifically for the beautifier function *after* document ready
+
+     // Basic check for html_beautify (can be deferred)
     if (typeof html_beautify !== 'function') {
-        console.warn('ConvertCart Admin: html_beautify function not found after document ready. Formatting will likely fail.');
-    } else {
-        console.log('ConvertCart Admin: html_beautify function IS available after document ready.');
     }
 
-    console.log('ConvertCart Admin: Script loaded. Using editor settings:', convertCartAdminData.editorSettings);
-
-    // --- Beautify Options ---
     var beautifyOptions = {
-        // indent_size: 4, // Size is irrelevant for tabs
-        indent_char: '\t', // Use tab character for indentation
-        max_preserve_newlines: 1,
-        preserve_newlines: true,
-        keep_array_indentation: false,
-        break_chained_methods: false,
-        indent_scripts: 'normal',
-        brace_style: 'collapse',
-        space_before_conditional: true,
-        unescape_strings: false,
-        jslint_happy: false,
-        end_with_newline: false,
-        wrap_line_length: 0,
-        indent_inner_html: true,
-        comma_first: false,
-        e4x: false,
-        indent_empty_lines: false
+        indent_size: 2,
+        space_in_empty_paren: true,
+        wrap_line_length: 0 // Don't wrap lines automatically
     };
 
-    // --- Process Each Editor ---
-    $('.consent-html-editor').each(function(index) {
+    $('.consent-html-editor').each(function() {
         var $textarea = $(this);
-        var editorId = $textarea.attr('id') || $textarea.attr('name') || 'editor-' + index;
-        var consentType = $textarea.data('consent-type');
+        var editorId = $textarea.attr('id');
 
-        console.log(`ConvertCart Admin: Processing editor [${editorId}] for type [${consentType}]`);
+        var editorSettings = wp.codeEditor.defaultSettings ?
+            _.clone(wp.codeEditor.defaultSettings) : {};
 
-        // --- Setup Containers ---
-        var $container = $('<div>', { class: 'editor-container' });
-        var $buttonContainer = $('<div>', { class: 'button-container' });
-        $textarea.wrap($container);
-        $textarea.after($buttonContainer);
+        // Merge our specific settings
+        editorSettings.codemirror = _.extend({},
+            editorSettings.codemirror,
+            convertCartAdminData.editorSettings // Use localized settings
+        );
 
-        // --- Initialize CodeMirror ---
-        // Use the settings passed directly from wp_enqueue_code_editor
-        var editorSettings = convertCartAdminData.editorSettings || {};
-        var editorInstance = wp.codeEditor.initialize($textarea, editorSettings);
-
-        if (!editorInstance || typeof editorInstance.codemirror === 'undefined') {
-             console.error(`ConvertCart Admin: Failed to initialize CodeMirror for [${editorId}]`);
-             // Attempt to remove the containers if init failed
-             $buttonContainer.remove();
-             if ($textarea.parent().is('.editor-container')) {
-                 $textarea.unwrap();
-             }
-             return; // Skip this textarea
+        // Initialize the CodeMirror editor
+        var cmInstance;
+        try {
+            cmInstance = wp.codeEditor.initialize($textarea, editorSettings).codemirror;
+        } catch (e) {
+            $textarea.show();
+            return; // Skip this editor if initialization fails
         }
-        console.log(`ConvertCart Admin: CodeMirror initialized successfully for [${editorId}]`);
-        var cmInstance = editorInstance.codemirror;
 
-        // --- Create Buttons ---
+        // --- Add Buttons ---
+        var $wrapper = $textarea.closest('.codemirror-wrapper-div'); // Find the wrapper we added
+        if ($wrapper.length === 0) {
+             return; // Skip adding buttons if wrapper not found
+        }
+
+        var $buttonContainer = $('<div class="convertcart-editor-buttons" style="margin-top: 5px;"></div>');
+        $wrapper.after($buttonContainer); // Place buttons after the editor wrapper
+
         // Format Button
-        var $formatBtn = $('<button>', {
-            type: 'button',
-            class: 'button button-secondary format-button',
-            text: convertCartAdminData.i18n.formatButton || 'Format HTML'
-        }).on('click', function() {
-            console.log(`ConvertCart Admin: Format button clicked for [${editorId}]`);
+        var $formatBtn = $('<button type="button" class="button button-secondary format-html-btn" style="margin-right: 5px;"></button>')
+            .text(convertCartAdminData.i18n.formatButton || 'Format HTML'); // Use localized text
+
+        $formatBtn.on('click', function() {
             if (typeof html_beautify === 'function') {
-                console.log(`ConvertCart Admin: html_beautify IS available inside click handler for [${editorId}].`);
                 try {
                     var currentCode = cmInstance.getValue();
                     var formattedCode = html_beautify(currentCode, beautifyOptions);
                     if (currentCode !== formattedCode) {
                         cmInstance.setValue(formattedCode);
-                        console.log(`ConvertCart Admin: Formatting applied for [${editorId}]`);
-                    } else {
-                        console.log(`ConvertCart Admin: Code already formatted for [${editorId}]`);
                     }
                 } catch (e) {
-                    console.error(`ConvertCart Admin: Error during HTML formatting for [${editorId}]:`, e);
-                    alert('An error occurred while formatting the HTML. Check console for details.');
+                    alert('Error formatting HTML. Check browser console.');
                 }
             } else {
-                console.error(`ConvertCart Admin: html_beautify IS NOT available inside click handler for [${editorId}].`);
-                alert('HTML formatting library (js-beautify) not loaded or available when needed.');
+                alert('HTML formatting library not loaded.');
             }
         });
 
         // Reset Button
-        var $resetBtn = $('<button>', {
-            type: 'button',
-            class: 'button button-secondary reset-button',
-            text: convertCartAdminData.i18n.resetButton || 'Reset to Default'
-        }).on('click', function() {
-            console.log(`ConvertCart Admin: Reset button clicked for [${editorId}]`);
+        var $resetBtn = $('<button type="button" class="button button-secondary reset-html-btn"></button>')
+            .text(convertCartAdminData.i18n.resetButton || 'Reset to Default'); // Use localized text
+        var consentType = $textarea.data('consent-type'); // Get type from data attribute
+
+        $resetBtn.on('click', function() {
             var defaultHtml = convertCartAdminData.defaultTemplates[consentType];
             if (typeof defaultHtml !== 'undefined') {
-                if (confirm(convertCartAdminData.i18n.resetConfirm || 'Are you sure you want to reset?')) {
+                if (confirm(convertCartAdminData.i18n.resetConfirm || 'Are you sure you want to reset this template to its default?')) {
                     cmInstance.setValue(defaultHtml);
                     // Optionally re-format after resetting
                     if (typeof html_beautify === 'function') {
@@ -153,19 +94,16 @@ jQuery(document).ready(function($) {
                             var formattedDefault = html_beautify(defaultHtml, beautifyOptions);
                             cmInstance.setValue(formattedDefault);
                          } catch(e) {
-                             console.error(`ConvertCart Admin: Error formatting default HTML for [${editorId}]:`, e);
                          }
                     }
-                    console.log(`ConvertCart Admin: Reset HTML applied for [${editorId}]`);
                 }
             } else {
-                 console.warn(`ConvertCart Admin: Default template not found for type [${consentType}] for editor [${editorId}]`);
+                 alert('Default template data not found.');
             }
         });
 
         // Append buttons
         $buttonContainer.append($formatBtn, $resetBtn);
-        console.log(`ConvertCart Admin: Buttons added for [${editorId}]`);
 
         // --- Initial Formatting & Refresh ---
         if (typeof html_beautify === 'function') {
@@ -176,26 +114,20 @@ jQuery(document).ready(function($) {
                     // Only set if different to avoid unnecessary changes
                     if (initialCode !== formattedInitialCode) {
                          cmInstance.setValue(formattedInitialCode);
-                         console.log(`ConvertCart Admin: Initial formatting applied for [${editorId}]`);
                     }
                 }
             } catch(e) {
-                console.error(`ConvertCart Admin: Error formatting initial HTML for [${editorId}]:`, e);
             }
-        } else {
-            console.warn(`ConvertCart Admin: html_beautify not available for initial formatting on [${editorId}].`);
         }
 
         // Refresh the editor - crucial for CodeMirror to render correctly
         setTimeout(function() {
-            cmInstance.refresh();
-            console.log(`ConvertCart Admin: Refreshed editor [${editorId}]`);
-        }, 200); // Slightly longer delay just in case
+            try {
+                cmInstance.refresh();
+            } catch(e) {
+            }
+        }, 100);
 
     }); // End .each loop
 
-    console.log('ConvertCart Admin: Initialization loop finished.');
-
-}); // End document ready 
-
-console.log('ConvertCart Admin JS: File Execution Finished (Bottom Level)'); 
+}); // End document ready

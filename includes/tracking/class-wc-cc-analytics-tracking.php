@@ -29,23 +29,14 @@ class WC_CC_Analytics_Tracking extends WC_CC_Base {
         $client_id = $this->integration->get_option('cc_client_id');
         $client_id_exists = !empty($client_id);
 
-        // Log the result of the check
-        error_log("ConvertCart Debug (Tracking Init): Checking conditions - Client ID / Domain ID Exists: " . ($client_id_exists ? 'Yes (' . $client_id . ')' : 'No'));
-
         // Only add tracking hooks if the Client ID exists
         if ($client_id_exists) {
-            // Add this log to confirm the condition passed
-            error_log("ConvertCart Debug (Tracking Init): Client ID found. Adding tracking hooks (wp_head: add_tracking_code, woocommerce_thankyou: track_order).");
-
             // Add hook for the main script in the head
             add_action('wp_head', [$this, 'add_tracking_code']);
 
             // Add hook for order tracking on thank you page
             add_action('woocommerce_thankyou', [$this, 'track_order']);
 
-        } else {
-            // Log if Client ID is missing
-            error_log("ConvertCart Debug (Tracking Init): Tracking hooks skipped - Client ID / Domain ID is missing in settings.");
         }
     }
 
@@ -53,17 +44,12 @@ class WC_CC_Analytics_Tracking extends WC_CC_Base {
      * Add tracking code to head.
      */
     public function add_tracking_code(): void {
-        // Add log to confirm this runs
-        error_log("ConvertCart Debug (Tracking): add_tracking_code hook fired.");
-
-        // --- Original Code Start ---
         $client_id = $this->integration->get_option('cc_client_id');
         if (empty($client_id)) {
-             error_log("ConvertCart Debug (Tracking): add_tracking_code - Client ID empty, bailing.");
             return;
         }
 
-        // Assuming the original code outputs the main ConvertCart JS library loader here
+        // Outputs the main ConvertCart JS library loader
         ?>
         <script type="text/javascript">
             (function(c,o,v,e,r,t){
@@ -72,9 +58,6 @@ class WC_CC_Analytics_Tracking extends WC_CC_Base {
             })(window,document,'script','https://cdn.convertcart.com/<?php echo esc_js($client_id); ?>.js','cc');
         </script>
         <?php
-        // --- Original Code End ---
-
-        error_log("ConvertCart Debug (Tracking): add_tracking_code - Executed successfully."); // Add success log
     }
 
     /**
@@ -83,9 +66,6 @@ class WC_CC_Analytics_Tracking extends WC_CC_Base {
      * Kept for potential future use or direct calls if needed.
      */
     public function add_events(): void {
-         // Add log to confirm this runs (though it shouldn't via wp_footer anymore)
-        error_log("ConvertCart Debug (Tracking - WC_CC_Analytics_Tracking): add_events method executed (Hook likely removed).");
-
         // --- Original Code Start (Commented out) ---
         // try { ... } catch { ... }
         // --- Original Code End ---
@@ -110,7 +90,10 @@ class WC_CC_Analytics_Tracking extends WC_CC_Base {
             $event_data = $this->get_order_event_data($order);
             $this->output_tracking_script('orderCompleted', $event_data);
         } catch (Exception $e) {
-            $this->log_error($e->getMessage());
+            // Log critical errors if necessary, otherwise remove for production
+            // error_log("ConvertCart ERROR: Failed to track order {$order_id}: " . $e->getMessage());
+            // OR keep the $this->log_error call if that method handles production logging appropriately.
+            // $this->log_error("Failed to track order {$order_id}: " . $e->getMessage());
         }
     }
 
@@ -249,16 +232,5 @@ class WC_CC_Analytics_Tracking extends WC_CC_Base {
             window._cc.push(['track', '<?php echo esc_js($event); ?>', <?php echo wp_json_encode($data); ?>]);
         </script>
         <?php
-    }
-
-    /**
-     * Log error message.
-     *
-     * @param string $message Error message
-     */
-    private function log_error(string $message): void {
-        if ($this->integration->get_option('debug_mode') === 'yes') {
-            wc_get_logger()->error($message, ['source' => 'convertcart']);
-        }
     }
 } 

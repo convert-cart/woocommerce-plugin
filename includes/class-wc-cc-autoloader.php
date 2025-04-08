@@ -23,14 +23,13 @@ class WC_CC_Autoloader {
     }
 
     /**
-     * Take a class name and turn it into a file name.
+     * Get the file name from the class name.
+     * e.g. WC_CC_Integration -> class-wc-cc-integration.php
      *
      * @param string $class Class name.
-     * @return string
+     * @return string File name.
      */
     private function get_file_name_from_class(string $class): string {
-        // Remove any namespace from the class name
-        $class = basename(str_replace('\\', '/', $class));
         return 'class-' . str_replace('_', '-', strtolower($class)) . '.php';
     }
 
@@ -38,46 +37,46 @@ class WC_CC_Autoloader {
      * Include a class file.
      *
      * @param string $path File path.
-     * @return bool Successful or not.
+     * @return bool Success or failure.
      */
     private function load_file(string $path): bool {
         if ($path && is_readable($path)) {
-            require_once $path;
+            include_once $path;
             return true;
         }
-        
         return false;
     }
 
     /**
-     * Auto-load ConvertCart\Analytics classes.
+     * Auto-load WC classes on demand to reduce memory consumption.
      *
      * @param string $class Class name.
      */
     public function autoload(string $class): void {
-        if (0 !== strpos($class, 'ConvertCart\\Analytics\\')) {
+        // Only autoload classes from this plugin's namespace
+        if (0 !== strpos($class, __NAMESPACE__ . '\\')) {
             return;
         }
 
-        // Remove the namespace prefix
-        $relative_class = substr($class, strlen('ConvertCart\\Analytics\\'));
-        
+        // Remove the root namespace
+        $relative_class = substr($class, strlen(__NAMESPACE__ . '\\'));
+
         // Convert namespace separators to directory separators
         $relative_path = str_replace('\\', DIRECTORY_SEPARATOR, $relative_class);
-        
+
         // Get the file name
         $class_name = basename($relative_path);
         $file_name = $this->get_file_name_from_class($class_name);
-        
+
         // Build the full path
         $path = $this->include_path;
         $dir_path = dirname($relative_path);
         if ($dir_path !== '.') {
-            $path .= DIRECTORY_SEPARATOR . strtolower($dir_path);
+            $path .= DIRECTORY_SEPARATOR . strtolower($dir_path); // Ensure subdirectories are lowercase
         }
-        
+
         $full_path = $path . DIRECTORY_SEPARATOR . $file_name;
-        
+
         // Try to load the file
         $this->load_file($full_path);
     }

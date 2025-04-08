@@ -61,134 +61,79 @@ class WC_CC_Analytics extends WC_Integration {
      * Initialize the integration.
      */
     public function __construct() {
-        error_log("ConvertCart Debug (Main Integration): CONSTRUCTOR START");
+        $this->id                 = 'cc_analytics';
+        $this->method_title       = __('Convert Cart Analytics', 'woocommerce_cc_analytics');
+        $this->method_description = __('Integration with Convert Cart Analytics service.', 'woocommerce_cc_analytics');
 
-        // *** Store constants in properties ***
-        // Ensure constants are defined globally before this runs
+        // Store plugin path and URL from constants
         $this->plugin_url = defined('CONVERTCART_ANALYTICS_URL') ? CONVERTCART_ANALYTICS_URL : '';
         $this->plugin_path = defined('CONVERTCART_ANALYTICS_PATH') ? CONVERTCART_ANALYTICS_PATH : '';
-        $this->plugin_version = defined('CONVERTCART_ANALYTICS_VERSION') ? CONVERTCART_ANALYTICS_VERSION : '1.0.0'; // Default version
+        $this->plugin_version = defined('CONVERTCART_ANALYTICS_VERSION') ? CONVERTCART_ANALYTICS_VERSION : 'unknown';
 
-        if (empty($this->plugin_url) || empty($this->plugin_path)) {
-             error_log("ConvertCart Debug (Main Integration): WARNING - CONVERTCART_ANALYTICS_URL or _PATH constants not defined!");
-        } else {
-             error_log("ConvertCart Debug (Main Integration): Stored Plugin URL: " . $this->plugin_url);
-             error_log("ConvertCart Debug (Main Integration): Stored Plugin Path: " . $this->plugin_path);
-        }
-
-        global $woocommerce;
-        
-        $this->id = 'cc_analytics';
-        $this->method_title = __('CC Analytics Settings', 'woocommerce_cc_analytics');
-        $this->method_description = __('Contact Convert Cart To Get Client ID / Domain Id', 'woocommerce_cc_analytics');
-
-        // Initialize components
-        error_log("ConvertCart Debug (Main Integration): Constructor - Before init_components()");
-        $this->init_components();
-        error_log("ConvertCart Debug (Main Integration): Constructor - After init_components()");
-
-        // Load settings
+        // Load settings.
         $this->init_form_fields();
         $this->init_settings();
 
-        // Hook into actions and filters
-        error_log("ConvertCart Debug (Main Integration): Constructor - Before init_hooks()");
+        $this->init_components();
         $this->init_hooks();
-        error_log("ConvertCart Debug (Main Integration): Constructor - After init_hooks()");
-
-        // Log that the main integration class is constructed
-        error_log("ConvertCart Debug (Main Integration): __construct finished for {$this->id}.");
     }
 
     /**
      * Initialize plugin components.
      */
     private function init_components(): void {
-        error_log("ConvertCart Debug (Main Integration): INIT_COMPONENTS START");
-
         // Example: Initialize Admin
         if (is_admin()) {
-            error_log("ConvertCart Debug (Main Integration): init_components - Initializing Admin...");
             $this->admin = new WC_CC_Admin($this);
-            error_log("ConvertCart Debug (Main Integration): Admin initialized.");
         }
 
         // Example: Initialize Consent Modules
-        error_log("ConvertCart Debug (Main Integration): init_components - Initializing SMS Consent...");
         $this->sms_consent = new WC_CC_SMS_Consent($this, $this->plugin_url, $this->plugin_path, $this->plugin_version);
-        error_log("ConvertCart Debug (Main Integration): SMS Consent initialized.");
-
-        error_log("ConvertCart Debug (Main Integration): init_components - Initializing Email Consent...");
         $this->email_consent = new WC_CC_Email_Consent($this, $this->plugin_url, $this->plugin_path, $this->plugin_version);
-        error_log("ConvertCart Debug (Main Integration): Email Consent initialized.");
 
         // Example: Initialize Tracking
-        error_log("ConvertCart Debug (Main Integration): init_components - Initializing Tracking...");
         $this->tracking = new WC_CC_Analytics_Tracking($this);
-        error_log("ConvertCart Debug (Main Integration): Tracking initialized.");
 
-        // *** Add Event Manager Initialization HERE ***
+        // Initialize Event Manager only if Client ID is set
         $client_id = $this->get_option('cc_client_id');
         if (!empty($client_id)) {
-            error_log("ConvertCart Debug (Main Integration): init_components - Client ID found. Initializing Event Manager...");
             $this->event_manager = new Event_Manager($this); // EventManager constructor calls its setup_hooks
-            error_log("ConvertCart Debug (Main Integration): Event Manager initialized.");
         } else {
-             error_log("ConvertCart Debug (Main Integration): init_components - Event Manager NOT initialized (No Client ID).");
+            error_log("ConvertCart Info (Main Integration): Event Manager not initialized because Client ID is empty.");
         }
-
-        // Example: Initialize REST Controller if you have one
-        // error_log("ConvertCart Debug (Main Integration): init_components - Initializing REST Controller...");
-        // $this->rest_controller = new WC_CC_REST_Controller($this);
-        // error_log("ConvertCart Debug (Main Integration): REST Controller initialized.");
-
-        error_log("ConvertCart Debug (Main Integration): init_components finished.");
     }
 
     /**
-     * Initialize hooks.
-     * This is where component hooks should be added, AFTER components are instantiated.
+     * Initialize hooks for components.
      */
     private function init_hooks(): void {
-         error_log("ConvertCart Debug (Main Integration): INIT_HOOKS START");
-
-        // Hook for saving settings
-        add_action('woocommerce_update_options_integration_' . $this->id, [$this, 'process_admin_options']);
-
-        // Initialize component hooks only if Client ID is set (applies to frontend tracking/events)
+        // Initialize component hooks only if Client ID is set
         $client_id = $this->get_option('cc_client_id');
         if (empty($client_id)) {
-             error_log("ConvertCart Debug (Main Integration - init_hooks): Bailing component hooks because Client ID is empty.");
-            return; // Don't add frontend hooks if tracking isn't configured
+            // Keep this important configuration log
+            error_log("ConvertCart Info: Client ID missing - frontend tracking disabled.");
+            return;
         }
-         error_log("ConvertCart Debug (Main Integration - init_hooks): Client ID found, proceeding to init component hooks.");
 
         // Call init() on components that need to add hooks
         if (isset($this->admin) && is_admin()) { // Admin hooks only needed in admin area
-             $this->admin->init();
-             error_log("ConvertCart Debug (Main Integration - init_hooks): Called admin->init().");
+            $this->admin->init();
         }
         if (isset($this->sms_consent)) {
             $this->sms_consent->init();
-             error_log("ConvertCart Debug (Main Integration - init_hooks): Called sms_consent->init().");
         }
         if (isset($this->email_consent)) {
             $this->email_consent->init();
-             error_log("ConvertCart Debug (Main Integration - init_hooks): Called email_consent->init().");
         }
         if (isset($this->tracking)) {
-            $this->tracking->init(); // Tracking hooks (wp_head, wp_footer) added here
-             error_log("ConvertCart Debug (Main Integration - init_hooks): Called tracking->init().");
+            $this->tracking->init(); // Tracking hooks (wp_head, woocommerce_thankyou) added here
         }
         // EventManager constructor already calls its setup_hooks, so no ->init() needed here.
 
         // REST Controller hooks (if used)
         // if (isset($this->rest_controller)) {
         //     $this->rest_controller->register_routes(); // Assuming this adds the necessary hooks
-        //     error_log("ConvertCart Debug (Main Integration - init_hooks): Called rest_controller->register_routes().");
         // }
-
-         error_log("ConvertCart Debug (Main Integration - init_hooks): Finished.");
     }
 
     /**
@@ -244,7 +189,7 @@ class WC_CC_Analytics extends WC_Integration {
         return $this->plugin_path;
     }
 
-     public function get_plugin_version(): string {
+    public function get_plugin_version(): string {
         return $this->plugin_version;
     }
 }

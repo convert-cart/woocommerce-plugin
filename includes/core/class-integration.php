@@ -33,7 +33,6 @@ class Integration {
 		// Keep the component initialization for now if needed elsewhere,
 		// but ideally, this logic should move to WC_CC_Analytics.
 		// $this->init_components(); // Comment this out for now to prevent early consent instantiation
-		error_log('Core\Integration constructor called.'); // Add log
 	}
 
 	/**
@@ -52,7 +51,8 @@ class Integration {
 	 * Initialize plugin components.
 	 */
 	public function init_components() {
-		error_log('Core\Integration init_components called.'); // Add log
+		// Remove debug log
+		// error_log('Core\Integration init_components called.');
 		// Comment out the instantiation here
 		// if (class_exists('\ConvertCart\Analytics\Consent\SMS_Consent')) {
 		//     new \ConvertCart\Analytics\Consent\SMS_Consent($this);
