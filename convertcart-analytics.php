@@ -3,7 +3,7 @@
  * Plugin Name: Convert Cart Analytics
  * Plugin URI: https://convertcart.com
  * Description: Convert Cart Analytics integration for WooCommerce
- * Version: 1.0.0
+ * Version: 1.3.3-beta
  * Author: Convert Cart
  * Author URI: https://convertcart.com
  * Text Domain: woocommerce_cc_analytics
