@@ -3,11 +3,9 @@
  * Plugin Name: Convert Cart Analytics
  * Plugin URI: https://convertcart.com
  * Description: Convert Cart Analytics integration for WooCommerce
- * Version: 1.0.0
+ * Version: 1.4.0
  * Author: Convert Cart
  * Author URI: https://convertcart.com
- * Text Domain: woocommerce_cc_analytics
- * Domain Path: /languages/
  * Requires at least: 5.8
  * Requires PHP: 7.4
  * WC requires at least: 5.0
@@ -19,7 +17,7 @@
 defined('ABSPATH') || exit;
 
 // Define constants
-define('CONVERTCART_ANALYTICS_VERSION', '1.0.0');
+define('CONVERTCART_ANALYTICS_VERSION', '1.4.0');
 define('CONVERTCART_ANALYTICS_PATH', plugin_dir_path(__FILE__));
 define('CONVERTCART_ANALYTICS_URL', plugin_dir_url(__FILE__));
 define('CONVERTCART_PLUGIN_FILE', __FILE__);
