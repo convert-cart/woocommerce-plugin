@@ -27,6 +27,7 @@ class Event_Manager {
 	 * @param Integration $integration Integration instance.
 	 */
 	public function __construct( $integration ) {
+		error_log("ConvertCart Debug (EventManager): __construct called.");
 		$this->integration = $integration;
 		$this->setup_hooks();
 	}
@@ -35,8 +36,10 @@ class Event_Manager {
 	 * Setup hooks.
 	 */
 	private function setup_hooks() {
+		error_log("ConvertCart Debug (EventManager): setup_hooks called.");
 		add_action( 'wp_footer', array( $this, 'add_events' ) );
 		add_action( 'woocommerce_thankyou', array( $this, 'ordered' ) );
+		error_log("ConvertCart Debug (EventManager): Added hook 'wp_footer' for 'add_events'.");
 	}
 
 	/**
@@ -99,30 +102,47 @@ class Event_Manager {
 	 * Add events to the page.
 	 */
 	public function add_events() {
+		error_log("ConvertCart Debug (EventManager): add_events hook fired.");
 		try {
 			global $wp_query;
 			$event_info = array();
 
 			if ( is_product_category() ) {
 				$event_info = $this->get_category_viewed_props();
+				error_log("ConvertCart Debug (EventManager): Detected product category page.");
 			} elseif ( is_product() ) {
 				$event_info = $this->get_product_viewed_props();
+				error_log("ConvertCart Debug (EventManager): Detected product page.");
 			} elseif ( is_cart() ) {
 				$event_info['ccEvent'] = $this->get_event_type( 'cartViewed' );
 				$event_info['items']   = $this->get_cart_items();
+				error_log("ConvertCart Debug (EventManager): Detected cart page.");
 			} elseif ( is_checkout() ) {
-				$event_info['ccEvent'] = $this->get_event_type( 'checkoutStarted' );
-				$event_info['items']   = $this->get_cart_items();
+				// Make sure not to fire on thank you page if 'ordered' handles it
+				if (!is_wc_endpoint_url('order-received')) {
+					$event_info['ccEvent'] = $this->get_event_type( 'checkoutStarted' );
+					$event_info['items']   = $this->get_cart_items();
+					error_log("ConvertCart Debug (EventManager): Detected checkout page.");
+				} else {
+					error_log("ConvertCart Debug (EventManager): Detected order-received endpoint, skipping checkoutStarted event.");
+				}
 			} elseif ( is_front_page() || is_home() || is_page() ) {
 				$event_info = $this->get_content_page_props();
+				error_log("ConvertCart Debug (EventManager): Detected content page (front/home/page).");
+			} else {
+				error_log("ConvertCart Debug (EventManager): No specific event detected for this page type.");
 			}
 
 			if ( ! empty( $event_info ) ) {
+				error_log("ConvertCart Debug (EventManager): Event info found, calling display_event_script.");
 				$this->display_event_script( $event_info );
+			} else {
+				error_log("ConvertCart Debug (EventManager): Event info is empty, skipping display_event_script.");
 			}
 		} catch ( \Exception $e ) {
 			// Use WC_Logger instead of error_log for better debugging in production.
-			wc_get_logger()->error( 'ConvertCart Error: ' . $e->getMessage(), array( 'source' => 'convertcart-analytics' ) );
+			wc_get_logger()->error( 'ConvertCart Error (EventManager - add_events): ' . $e->getMessage(), array( 'source' => 'convertcart-analytics' ) );
+			error_log('ConvertCart Error (EventManager - add_events): ' . $e->getMessage());
 		}
 	}
 
@@ -226,18 +246,22 @@ class Event_Manager {
 	 */
 	public function display_event_script( $event_info ) {
 		if ( empty( $event_info ) ) {
+			error_log("ConvertCart Debug (EventManager): display_event_script called but event_info is empty.");
 			return;
 		}
+		error_log("ConvertCart Debug (EventManager): display_event_script called with event: " . ($event_info['ccEvent'] ?? 'N/A'));
 
 		$event_json = wp_json_encode( $event_info );
 		?>
-		<!-- ConvertCart -->
+		<!-- ConvertCart Event Data -->
 		<script>
 			window.ccLayer = window.ccLayer || [];
 			ccLayer.push(<?php echo wp_kses_post( $event_json ); ?>);
+			console.log('ConvertCart: Pushed event to ccLayer', <?php echo wp_kses_post( $event_json ); ?>);
 		</script>
-		<!-- ConvertCart -->
+		<!-- /ConvertCart Event Data -->
 		<?php
+		error_log("ConvertCart Debug (EventManager): display_event_script finished outputting script.");
 	}
 
 	/**
