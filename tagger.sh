@@ -4,7 +4,8 @@
 BRANCH="master"
 MAIN_VERSION=$1
 BETA_VERSION="${MAIN_VERSION}-beta"
-BACKUP_BRANCH="temp-tagging-branch"  # Define the backup branch name
+BACKUP_BRANCH="temp-tagging-branch"
+PLUGIN_FILE="convertcart-analytics.php"  # Updated plugin file name
 
 # Color codes
 RED='\033[0;31m'
@@ -15,7 +16,7 @@ NC='\033[0m' # No Color
 # Exit the script if any command fails
 set -e
 
-# Function to handle errors (POSIX compliant)
+# Function to handle errors
 handle_error() {
     printf "${RED}Error: %s${NC}\n" "$1"
     cleanup
@@ -24,20 +25,16 @@ handle_error() {
 
 # Cleanup function
 cleanup() {
-    # Store current branch
     local current_branch=$(git rev-parse --abbrev-ref HEAD)
 
     git reset .
     git clean -fd .
     git checkout .
 
-    # Checkout master branch
     printf "${YELLOW}Checking out master branch during cleanup...${NC}\n"
     git checkout $BRANCH || printf "${RED}Failed to checkout $BRANCH during cleanup.${NC}\n"
 
-    # Delete the temporary branch if it exists
     if git show-ref --verify --quiet refs/heads/$BACKUP_BRANCH; then
-        # Make sure we're not on the branch we're trying to delete
         if [ "$current_branch" = "$BACKUP_BRANCH" ]; then
             git checkout $BRANCH
         fi
@@ -50,7 +47,7 @@ if [ -z "$MAIN_VERSION" ]; then
     handle_error "Please provide a version number. Usage: ./tagger.sh VERSION_NUMBER"
 fi
 
-# Check for uncommitted changes and warn the user
+# Check for uncommitted changes
 if [ -n "$(git status --porcelain)" ]; then
     printf "${RED}Warning: You have uncommitted changes!${NC}\n"
     printf "${RED}All your local changes will be lost if you continue.${NC}\n"
@@ -82,7 +79,7 @@ if git show-ref --verify --quiet refs/heads/$BACKUP_BRANCH; then
     git branch -D $BACKUP_BRANCH || handle_error "Failed to delete old backup branch"
 fi
 
-# Create a backup branch to prevent affecting master directly
+# Create a backup branch
 git checkout -b $BACKUP_BRANCH || handle_error "Failed to create temporary branch $BACKUP_BRANCH"
 
 # Function to check if a tag exists on remote
@@ -112,8 +109,8 @@ confirm_tag_deletion() {
 delete_tag() {
     local tag=$1
     printf "${YELLOW}Deleting tag %s locally and remotely...${NC}\n" "$tag"
-    git tag -d "$tag" 2>/dev/null || true  # Delete local tag, don't error if it doesn't exist
-    git push origin ":refs/tags/$tag" 2>/dev/null || true  # Delete remote tag, don't error if it doesn't exist
+    git tag -d "$tag" 2>/dev/null || true
+    git push origin ":refs/tags/$tag" 2>/dev/null || true
 }
 
 # Check for existing remote tags
@@ -121,7 +118,7 @@ if [ "$choice" = "1" ] || [ "$choice" = "3" ]; then
     if check_remote_tag_exists "$MAIN_VERSION"; then
         creation_date=$(get_tag_creation_date "$MAIN_VERSION")
         if confirm_tag_deletion "$MAIN_VERSION" "$creation_date"; then
-            delete_tag "$MAIN_VERSION" || handle_error "Failed to delete existing production tag"
+            delete_tag "$MAIN_VERSION"
         else
             printf "${GREEN}Skipping creation of production tag %s.${NC}\n" "$MAIN_VERSION"
         fi
@@ -132,7 +129,7 @@ if [ "$choice" = "2" ] || [ "$choice" = "3" ]; then
     if check_remote_tag_exists "$BETA_VERSION"; then
         creation_date=$(get_tag_creation_date "$BETA_VERSION")
         if confirm_tag_deletion "$BETA_VERSION" "$creation_date"; then
-            delete_tag "$BETA_VERSION" || handle_error "Failed to delete existing beta tag"
+            delete_tag "$BETA_VERSION"
         else
             printf "${GREEN}Skipping creation of beta tag %s.${NC}\n" "$BETA_VERSION"
         fi
@@ -148,77 +145,67 @@ printf "${YELLOW}Updating version and stable tag in README.md...${NC}\n"
 sed -i "s/^Stable tag: .*/Stable tag: $MAIN_VERSION/" README.md || handle_error "Failed to update stable tag in README.md"
 sed -i "s/badge\/v[0-9.]*\"/badge\/v$MAIN_VERSION\"/" README.md || handle_error "Failed to update badge version in README.md"
 
-# Update version, stable tag, and CC_PLUGIN_VERSION in convertcart-plugin.php
-printf "${YELLOW}Updating version information in convertcart-plugin.php...${NC}\n"
-sed -i "s/^ \* Version: .*/ \* Version: $MAIN_VERSION/" convertcart-plugin.php || handle_error "Failed to update version in convertcart-plugin.php"
-sed -i "s/^ \* Stable Tag: .*/ \* Stable Tag: $MAIN_VERSION/" convertcart-plugin.php || handle_error "Failed to update stable tag in convertcart-plugin.php"
-sed -i "s/define( 'CC_PLUGIN_VERSION', '.*' );/define( 'CC_PLUGIN_VERSION', '$MAIN_VERSION' );/" convertcart-plugin.php || handle_error "Failed to update CC_PLUGIN_VERSION in convertcart-plugin.php"
+# Update version in plugin file
+printf "${YELLOW}Updating version information in plugin file...${NC}\n"
+sed -i "s/^ \* Version: .*/ \* Version: $MAIN_VERSION/" $PLUGIN_FILE || handle_error "Failed to update version in plugin file"
+sed -i "s/^ \* Stable tag: .*/ \* Stable tag: $MAIN_VERSION/" $PLUGIN_FILE || handle_error "Failed to update stable tag in plugin file"
+sed -i "s/define( 'CONVERTCART_ANALYTICS_VERSION', '.*' );/define( 'CONVERTCART_ANALYTICS_VERSION', '$MAIN_VERSION' );/" $PLUGIN_FILE || handle_error "Failed to update version constant in plugin file"
 
-# Validate that the CHANGELOG.md is updated
+# Validate CHANGELOG.md
 if ! grep -q "$MAIN_VERSION" CHANGELOG.md; then
     handle_error "CHANGELOG.md is not updated with version $MAIN_VERSION"
 fi
 
 # Commit changes for production tag if chosen
 if [ "$choice" = "1" ] || [ "$choice" = "3" ]; then
-    git add composer.json README.md convertcart-plugin.php CHANGELOG.md || handle_error "Failed to add files for production commit"
+    git add composer.json README.md $PLUGIN_FILE CHANGELOG.md || handle_error "Failed to add files for production commit"
     git commit -m "Release version $MAIN_VERSION" || handle_error "Failed to commit production changes"
     
-    # Checkout master and merge changes
     printf "${YELLOW}Checking out master branch and merging changes...${NC}\n"
     git checkout master || handle_error "Failed to checkout master branch"
     git merge $BACKUP_BRANCH || handle_error "Failed to merge changes into master"
     
-    # Create and push the production tag
     git tag -a "$MAIN_VERSION" -m "Version $MAIN_VERSION" || handle_error "Failed to create production tag"
     
-    # Push changes to master branch
     printf "${YELLOW}Pushing changes to master branch...${NC}\n"
     git push origin master || handle_error "Failed to push changes to master branch"
     
-    # Push the production tag
     printf "${YELLOW}Pushing production tag %s...${NC}\n" "$MAIN_VERSION"
     git push origin "$MAIN_VERSION" || handle_error "Failed to push production tag"
     
     printf "${GREEN}Production tag %s created and pushed successfully${NC}\n" "$MAIN_VERSION"
     printf "${GREEN}Changes pushed to master branch successfully${NC}\n"
     
-    # Return to backup branch for potential beta tag creation
     git checkout $BACKUP_BRANCH || handle_error "Failed to return to backup branch"
 fi
 
-# Update to beta version in composer.json
-printf "${YELLOW}Updating composer.json with version %s...${NC}\n" "$BETA_VERSION"
-sed -i "s/\"version\": \"$MAIN_VERSION\"/\"version\": \"$BETA_VERSION\"/" composer.json || handle_error "Failed to update composer.json for beta"
-
-# Update CDN URL for beta tag
-printf "${YELLOW}Updating CDN URL for beta tag...${NC}\n"
-sed -i "s/cdn\.convertcart\.com/cdn-beta.convertcart.com/g" includes/core/class-integration.php || handle_error "Failed to update CDN URL for beta tag"
-
-# Update version information in convertcart-plugin.php for beta version
-printf "${YELLOW}Updating version information in convertcart-plugin.php for beta...${NC}\n"
-sed -i "s/^ \* Version: .*/ \* Version: $BETA_VERSION/" convertcart-plugin.php || handle_error "Failed to update version for beta"
-sed -i "s/^ \* Stable Tag: .*/ \* Stable Tag: $BETA_VERSION/" convertcart-plugin.php || handle_error "Failed to update stable tag for beta"
-sed -i "s/define( 'CC_PLUGIN_VERSION', '.*' );/define( 'CC_PLUGIN_VERSION', '$BETA_VERSION' );/" convertcart-plugin.php || handle_error "Failed to update CC_PLUGIN_VERSION for beta"
-
-# Update version information in README.md for beta version
-printf "${YELLOW}Updating version information in README.md for beta...${NC}\n"
-sed -i "s/^Stable tag: .*/Stable tag: $BETA_VERSION/" README.md || handle_error "Failed to update stable tag for beta"
-sed -i "s/badge\/v[0-9.]*\"/badge\/v$BETA_VERSION\"/" README.md || handle_error "Failed to update badge version for beta"
-
-# Commit changes for beta tag if chosen
+# Update to beta version
 if [ "$choice" = "2" ] || [ "$choice" = "3" ]; then
-    git add composer.json README.md includes/core/class-integration.php convertcart-plugin.php CHANGELOG.md || handle_error "Failed to add files for beta commit"
+    printf "${YELLOW}Updating version information for beta...${NC}\n"
+    
+    # Update composer.json
+    sed -i "s/\"version\": \"$MAIN_VERSION\"/\"version\": \"$BETA_VERSION\"/" composer.json || handle_error "Failed to update composer.json for beta"
+    
+    # Update plugin file
+    sed -i "s/^ \* Version: .*/ \* Version: $BETA_VERSION/" $PLUGIN_FILE || handle_error "Failed to update version for beta"
+    sed -i "s/^ \* Stable tag: .*/ \* Stable tag: $BETA_VERSION/" $PLUGIN_FILE || handle_error "Failed to update stable tag for beta"
+    sed -i "s/define( 'CONVERTCART_ANALYTICS_VERSION', '.*' );/define( 'CONVERTCART_ANALYTICS_VERSION', '$BETA_VERSION' );/" $PLUGIN_FILE || handle_error "Failed to update version constant for beta"
+    
+    # Update README.md
+    sed -i "s/^Stable tag: .*/Stable tag: $BETA_VERSION/" README.md || handle_error "Failed to update stable tag for beta"
+    sed -i "s/badge\/v[0-9.]*\"/badge\/v$BETA_VERSION\"/" README.md || handle_error "Failed to update badge version for beta"
+    
+    # Commit and tag beta version
+    git add composer.json README.md $PLUGIN_FILE || handle_error "Failed to add files for beta commit"
     git commit -m "Release beta version $BETA_VERSION" || handle_error "Failed to commit beta version"
     git tag -a "$BETA_VERSION" -m "Beta version $BETA_VERSION" || handle_error "Failed to create beta tag"
     
-    # Push the beta tag
     printf "${YELLOW}Pushing beta tag %s...${NC}\n" "$BETA_VERSION"
     git push origin "$BETA_VERSION" || handle_error "Failed to push beta tag"
     
     printf "${GREEN}Beta tag %s created and pushed successfully${NC}\n" "$BETA_VERSION"
 fi
 
-# Final cleanup: Checkout master and clean up the temporary branch
+# Final cleanup
 cleanup
 printf "${GREEN}Tags processing completed.${NC}\n"
