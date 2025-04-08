@@ -100,7 +100,7 @@ class WC_CC_Analytics extends WC_Integration {
             $this->event_manager = new Event_Manager($this); // EventManager constructor calls its setup_hooks
         } else {
             error_log("ConvertCart Info (Main Integration): Event Manager not initialized because Client ID is empty.");
-        }
+		}
     }
 
     /**

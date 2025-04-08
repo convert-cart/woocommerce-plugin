@@ -1,0 +1,34 @@
+/* Editor Styles */
+.wp-admin .consent-html-editor {
+    width: 100%;
+    min-height: 200px;
+}
+
+.wp-admin .CodeMirror {
+    border: 1px solid #ddd;
+    height: 250px !important;
+}
+
+/* Button Container */
+.wp-admin .cc-editor-buttons {
+    margin: 8px 0 20px;
+    display: flex !important;
+    gap: 8px;
+}
+
+/* Individual Buttons */
+.wp-admin .cc-editor-buttons .button {
+    margin: 0;
+    min-width: 100px;
+}
+
+/* Editor Wrapper */
+.wp-admin .consent-editor-wrapper {
+    margin-bottom: 20px;
+    position: relative;  /* Ensure proper stacking context */
+}
+
+/* Success/Error Messages */
+.wp-admin .notice {
+    margin: 15px 0;
+} 

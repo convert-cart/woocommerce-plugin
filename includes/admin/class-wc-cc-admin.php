@@ -52,6 +52,7 @@ class WC_CC_Admin extends WC_CC_Base {
     public function init(): void {
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
         add_action('admin_init', [$this, 'register_settings']);
+        add_action('admin_notices', [$this, 'show_admin_notices']);
         
         // Initialize menu
         $this->menu->init();
@@ -104,6 +105,39 @@ class WC_CC_Admin extends WC_CC_Base {
             'default' => $this->email_consent->get_default_consent_html(),
             'show_in_rest' => false,
         ]);
+
+        // Add settings saved message
+        add_action('update_option_cc_sms_consent_checkout_html', function() {
+            add_settings_error(
+                'cc_consent_settings',
+                'settings_updated',
+                __('Settings saved.', 'woocommerce_cc_analytics'),
+                'success'
+            );
+        });
+
+        // Add error handling to sanitization for all consent fields
+        foreach (['sms', 'email'] as $type) {
+            foreach (['checkout', 'registration', 'account'] as $page) {
+                $option_name = "cc_{$type}_consent_{$page}_html";
+                add_filter("pre_update_option_{$option_name}", function($value, $old_value) use ($type, $page) {
+                    if ($value === false || $value === null) {
+                        add_settings_error(
+                            'cc_consent_settings',
+                            'invalid_html',
+                            sprintf(
+                                __('Invalid HTML provided for %s consent %s template.', 'woocommerce_cc_analytics'),
+                                strtoupper($type),
+                                $page
+                            ),
+                            'error'
+                        );
+                        return $old_value;
+                    }
+                    return $value;
+                }, 10, 2);
+            }
+        }
     }
 
     /**
@@ -189,5 +223,31 @@ class WC_CC_Admin extends WC_CC_Base {
         ];
 
         return in_array($screen_id, $expected_screen_ids, true);
+    }
+
+    /**
+     * Show admin notices for settings updates.
+     */
+    public function show_admin_notices(): void {
+        $screen = get_current_screen();
+        if (!$screen || !$this->is_plugin_page($screen->id)) {
+            return;
+        }
+
+        // Get all settings errors
+        $settings_errors = get_settings_errors('cc_consent_settings');
+        
+        // If no errors but settings were updated, show success message
+        if (empty($settings_errors) && isset($_GET['settings-updated']) && $_GET['settings-updated']) {
+            add_settings_error(
+                'cc_consent_settings',
+                'settings_updated',
+                __('Settings saved successfully.', 'woocommerce_cc_analytics'),
+                'success'
+            );
+        }
+
+        // Display all settings errors/notices
+        settings_errors('cc_consent_settings');
     }
 } 
