@@ -307,7 +307,7 @@ class WC_CC_Analytics extends \WC_Integration {
 	 *
 	 * @param type string $data .
 	 */
-	public function ordered( $data ) {
+	public function cc_purchase( $data ) {
 		try {
 			if ( is_wc_endpoint_url( 'order-received' ) ) {
 				$event_info['ccEvent'] = $this->getEventType( 'orderCompleted' );
@@ -1055,24 +1055,14 @@ class WC_CC_Analytics extends \WC_Integration {
 		
 		// Add main menu
 		$parent_slug = 'convert-cart';
-			add_menu_page(
-				__( 'Convert Cart', 'woocommerce_cc_analytics' ),
-				__( 'Convert Cart', 'woocommerce_cc_analytics' ),
+		add_menu_page(
+			__( 'Convert Cart', 'woocommerce_cc_analytics' ),
+			__( 'Convert Cart', 'woocommerce_cc_analytics' ),
 			'manage_woocommerce',
 			$parent_slug,
-			null,
+			null, // No callback for the main menu
 			'', // Icon is added via CSS
 			59
-		);
-		
-		// Add Dashboard submenu
-		add_submenu_page(
-			$parent_slug,
-			__( 'Convert Cart Dashboard', 'woocommerce_cc_analytics' ),
-			__( 'Dashboard', 'woocommerce_cc_analytics' ),
-			'manage_woocommerce',
-			$parent_slug,
-			array( $this, 'render_dashboard_page' )
 		);
 		
 		// Add SMS Consent submenu if enabled
@@ -1106,24 +1096,29 @@ class WC_CC_Analytics extends \WC_Integration {
 			__( 'Domain Settings', 'woocommerce_cc_analytics' ),
 			'manage_woocommerce',
 			'admin.php?page=wc-settings&tab=integration&section=' . $this->id,
-			''
+			null
 		);
+		
+		// Remove the default submenu that WordPress adds automatically
+		remove_submenu_page($parent_slug, $parent_slug);
 	}
 
 	/**
 	 * Add custom menu icon styles
 	 */
 	public function add_menu_icon_styles() {
+		// Get the correct path to the icon
+		$icon_url = plugin_dir_url( dirname( __FILE__ ) ) . 'assets/images/icon.svg';
 		?>
 		<style>
 			#adminmenu .toplevel_page_convert-cart .wp-menu-image {
-				background-image: url('<?php echo esc_url(plugin_dir_url( dirname( __FILE__ ) ) . 'assets/images/icon.svg'); ?>');
+				background-image: url('<?php echo esc_url($icon_url); ?>') !important;
 				background-repeat: no-repeat;
 				background-position: center center;
 				background-size: 20px auto;
 			}
 			#adminmenu .toplevel_page_convert-cart .wp-menu-image:before {
-				content: none;
+				content: none !important;
 			}
 		</style>
 		<?php
@@ -1131,30 +1126,16 @@ class WC_CC_Analytics extends \WC_Integration {
 
 	/**
 	 * Highlight the correct parent menu item
-	 *
-	 * @param string $parent_file The parent file.
-	 * @return string
 	 */
-	public function highlight_menu_item( $parent_file ) {
-		global $current_screen;
-		$plugin_page = isset($_GET['page']) ? $_GET['page'] : '';
+	public function highlight_menu_item($parent_file) {
+		global $plugin_page, $submenu_file;
 		
-		if (in_array($plugin_page, array(
-			'convert-cart',
-			'convert-cart-sms-consent',
-			'convert-cart-email-consent'
-		))) {
-			return 'convert-cart';
-		}
-		
-		if ( isset( $_GET['page'] ) && 
-			 $_GET['page'] === 'wc-settings' && 
-			 isset( $_GET['tab'] ) && 
-			 $_GET['tab'] === 'integration' && 
-			 isset( $_GET['section'] ) && 
-			 $_GET['section'] === $this->id 
-		) {
-			return 'convert-cart';
+		// Check if we're on the WC settings page with our integration section
+		if (isset($_GET['page']) && $_GET['page'] === 'wc-settings' && 
+			isset($_GET['tab']) && $_GET['tab'] === 'integration' && 
+			isset($_GET['section']) && $_GET['section'] === $this->id) {
+			
+			$parent_file = 'convert-cart';
 		}
 		
 		return $parent_file;
@@ -1162,19 +1143,14 @@ class WC_CC_Analytics extends \WC_Integration {
 
 	/**
 	 * Highlight the correct submenu item
-	 *
-	 * @param string $submenu_file The submenu file.
-	 * @return string
 	 */
-	public function highlight_submenu_item( $submenu_file ) {
-		if ( isset( $_GET['page'] ) && 
-			 $_GET['page'] === 'wc-settings' && 
-			 isset( $_GET['tab'] ) && 
-			 $_GET['tab'] === 'integration' && 
-			 isset( $_GET['section'] ) && 
-			 $_GET['section'] === $this->id 
-		) {
-			return 'admin.php?page=wc-settings&tab=integration&section=' . $this->id;
+	public function highlight_submenu_item($submenu_file) {
+		// Check if we're on the WC settings page with our integration section
+		if (isset($_GET['page']) && $_GET['page'] === 'wc-settings' && 
+			isset($_GET['tab']) && $_GET['tab'] === 'integration' && 
+			isset($_GET['section']) && $_GET['section'] === $this->id) {
+			
+			$submenu_file = 'admin.php?page=wc-settings&tab=integration&section=' . $this->id;
 		}
 		
 		return $submenu_file;
@@ -1305,8 +1281,8 @@ class WC_CC_Analytics extends \WC_Integration {
 				</div>
 
 				<div class="submit-buttons" style="display: flex; gap: 10px; margin-top: 20px;">
-					<input type="submit" name="restore_all" id="restore_all_button" value="<?php esc_attr_e('Restore All to Default', 'woocommerce_cc_analytics'); ?>" class="button button-secondary">
 					<?php submit_button( __( 'Save SMS Consent Settings', 'woocommerce_cc_analytics' ), 'primary', 'submit', false ); ?>
+					<input type="submit" name="restore_all" id="restore_all_button" value="<?php esc_attr_e('Restore All to Default', 'woocommerce_cc_analytics'); ?>" class="button button-secondary">
 				</div>
 			</form>
 		</div>
@@ -1423,8 +1399,8 @@ class WC_CC_Analytics extends \WC_Integration {
 				</div>
 
 				<div class="submit-buttons" style="display: flex; gap: 10px; margin-top: 20px;">
-					<input type="submit" name="restore_all" id="restore_all_button" value="<?php esc_attr_e('Restore All to Default', 'woocommerce_cc_analytics'); ?>" class="button button-secondary">
 					<?php submit_button( __( 'Save Email Consent Settings', 'woocommerce_cc_analytics' ), 'primary', 'submit', false ); ?>
+					<input type="submit" name="restore_all" id="restore_all_button" value="<?php esc_attr_e('Restore All to Default', 'woocommerce_cc_analytics'); ?>" class="button button-secondary">
 				</div>
 			</form>
 		</div>
