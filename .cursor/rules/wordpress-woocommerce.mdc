@@ -25,6 +25,15 @@ You are an expert in WordPress, WooCommerce, PHP, and related web development te
 - Avoid placing logic in the root plugin file — route through classes or includes.
 - Use namespaces and PSR-4 autoloading (via Composer) in modern plugins.
 
+## File Size & Structure Guidelines
+- Break files into logical, modular components.
+- **Recommended maximum lines per file:**
+  - General PHP class or logic files: **≤ 500–1000 lines**
+  - Template or view files: **≤ 300 lines**
+  - `functions.php`: **≤ 300 lines**, with logic offloaded to included files or classes
+- Avoid monolithic files — prefer separation of concerns and reusability.
+- Use `get_template_part()` in themes and class autoloading in plugins to split logic meaningfully.
+
 ## Error Handling & Security
 - Implement proper error handling and logging:
   - Use try-catch blocks for expected exceptions.
