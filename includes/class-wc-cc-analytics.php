@@ -57,79 +57,44 @@ class WC_CC_Analytics extends WC_Integration {
     /** @var string Plugin version. */
     private string $plugin_version;
 
+    /** @var string Client ID */
+    private string $cc_client_id;
+
+    /** @var string Debug mode */
+    private string $debug_mode;
+
     /**
      * Initialize the integration.
      */
     public function __construct() {
-        $this->id                 = 'cc_analytics';
-        $this->method_title       = __('Convert Cart Analytics', 'woocommerce_cc_analytics');
-        $this->method_description = __('Integration with Convert Cart Analytics service.', 'woocommerce_cc_analytics');
+        $this->id = 'cc_analytics';
+        $this->method_title = __('Convert Cart Analytics', 'woocommerce_cc_analytics');
+        $this->method_description = __('Integrate Convert Cart Analytics with your WooCommerce store.', 'woocommerce_cc_analytics');
 
-        // Store plugin path and URL from constants
-        $this->plugin_url = defined('CONVERTCART_ANALYTICS_URL') ? CONVERTCART_ANALYTICS_URL : '';
-        $this->plugin_path = defined('CONVERTCART_ANALYTICS_PATH') ? CONVERTCART_ANALYTICS_PATH : '';
-        $this->plugin_version = defined('CONVERTCART_ANALYTICS_VERSION') ? CONVERTCART_ANALYTICS_VERSION : 'unknown';
+        // Store plugin info
+        $this->plugin_url = CONVERTCART_ANALYTICS_URL;
+        $this->plugin_path = CONVERTCART_ANALYTICS_PATH;
+        $this->plugin_version = CONVERTCART_ANALYTICS_VERSION;
 
-        // Load settings.
+        // Load the form fields
         $this->init_form_fields();
+
+        // Load the settings
         $this->init_settings();
 
+        // Get settings values
+        $this->cc_client_id = $this->get_option('cc_client_id');
+        $this->debug_mode = $this->get_option('debug_mode');
+
+        // Initialize components
         $this->init_components();
-        $this->init_hooks();
+
+        // Save settings
+        add_action('woocommerce_update_options_integration_' . $this->id, array($this, 'process_admin_options'));
     }
 
     /**
-     * Initialize plugin components.
-     */
-    private function init_components(): void {
-        // Example: Initialize Admin
-        if (is_admin()) {
-            $this->admin = new WC_CC_Admin($this);
-        }
-
-        // Example: Initialize Consent Modules
-        $this->sms_consent = new WC_CC_SMS_Consent($this, $this->plugin_url, $this->plugin_path, $this->plugin_version);
-        $this->email_consent = new WC_CC_Email_Consent($this, $this->plugin_url, $this->plugin_path, $this->plugin_version);
-
-        // Example: Initialize Tracking
-        $this->tracking = new WC_CC_Analytics_Tracking($this);
-
-        // Initialize Event Manager only if Client ID is set
-        $client_id = $this->get_option('cc_client_id');
-        if (!empty($client_id)) {
-            $this->event_manager = new Event_Manager($this); // EventManager constructor calls its setup_hooks
-        } else {
-            error_log("ConvertCart Info (Main Integration): Event Manager not initialized because Client ID is empty.");
-		}
-    }
-
-    /**
-     * Initialize hooks for components.
-     */
-    private function init_hooks(): void {
-        $client_id = $this->get_option('cc_client_id');
-        if (empty($client_id)) {
-            return;
-        }
-
-        // Call init() on components that need to add hooks
-        if (isset($this->admin) && is_admin()) { // Admin hooks only needed in admin area
-            $this->admin->init();
-        }
-        if (isset($this->sms_consent)) {
-            $this->sms_consent->init();
-        }
-        if (isset($this->email_consent)) {
-            $this->email_consent->init();
-        }
-        if (isset($this->tracking)) {
-            $this->tracking->init(); // Tracking hooks (wp_head, woocommerce_thankyou) added here
-        }
-        // EventManager constructor already calls its setup_hooks, so no ->init() needed here.
-    }
-
-    /**
-     * Initialize integration settings form fields.
+     * Initialize form fields.
      */
     public function init_form_fields(): void {
         $this->form_fields = [
@@ -170,6 +135,27 @@ class WC_CC_Analytics extends WC_Integration {
                 'description' => __('Control email consent collection functionality.', 'woocommerce_cc_analytics'),
             ],
         ];
+    }
+
+    /**
+     * Initialize components.
+     */
+    private function init_components(): void {
+        // Initialize admin
+        $this->admin = new WC_CC_Admin($this);
+        $this->admin->init();
+
+        // Initialize REST controller
+        $this->rest_controller = new WC_CC_REST_Controller($this);
+        $this->rest_controller->init();
+
+        // Initialize consent handlers
+        $this->sms_consent = new WC_CC_SMS_Consent($this, $this->plugin_url, $this->plugin_path, $this->plugin_version);
+        $this->email_consent = new WC_CC_Email_Consent($this, $this->plugin_url, $this->plugin_path, $this->plugin_version);
+
+        // Initialize tracking
+        $this->tracking = new WC_CC_Analytics_Tracking($this);
+        $this->tracking->init();
     }
 
     // *** Add getters if needed elsewhere, though direct passing is preferred ***
