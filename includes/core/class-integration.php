@@ -45,14 +45,6 @@ class Integration {
 	}
 
 	/**
-	 * Initialize plugin components.
-	 */
-	public function init_components() {
-		// This method might be deprecated or refactored if component
-		// instantiation is fully handled by WC_CC_Analytics.
-	}
-
-	/**
 	 * Get metadata for tracking.
 	 *
 	 * @return array Metadata.
@@ -757,53 +749,6 @@ class Integration {
 			return $is_sms ? $this->get_default_sms_consent_html() : $this->get_default_email_consent_html();
 		} finally {
 			libxml_use_internal_errors(false);
-		}
-	}
-
-	/**
-	 * Clear all relevant caches
-	 */
-	public function clear_consent_caches() {
-		static $cleared = false;
-		
-		if ($cleared) {
-			return;
-		}
-		
-		try {
-			$option_keys = array(
-				'cc_sms_consent_checkout_html',
-				'cc_sms_consent_registration_html',
-				'cc_sms_consent_account_html',
-				'cc_email_consent_checkout_html',
-				'cc_email_consent_registration_html',
-				'cc_email_consent_account_html'
-			);
-			
-			foreach ($option_keys as $key) {
-				wp_cache_delete($key, 'options');
-			}
-			
-			if (function_exists('wc_delete_product_transients')) {
-				wc_delete_product_transients();
-				wc_delete_shop_order_transients();
-			}
-			
-			$cleared = true;
-		} catch (\Exception $e) {
-			error_log('Convert Cart Analytics: Cache clearing failed');
-		}
-	}
-
-	/**
-	 * Rate-limited cache clearing
-	 */
-	public function maybe_clear_consent_caches() {
-		$last_clear = get_transient('cc_analytics_cache_last_clear');
-		
-		if (!$last_clear || (time() - $last_clear) > 300) { // 5 minutes
-			$this->clear_consent_caches();
-			set_transient('cc_analytics_cache_last_clear', time(), 300);
 		}
 	}
 

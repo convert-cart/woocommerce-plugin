@@ -38,7 +38,6 @@ class WC_CC_Analytics_Tracking extends WC_CC_Base {
     public function add_tracking_script(): void {
         $client_id = $this->get_option('cc_client_id');
         if (empty($client_id)) {
-            // Client ID check is done before init() is called, but double-check just in case.
             return;
         }
         ?>
@@ -48,7 +47,7 @@ class WC_CC_Analytics_Tracking extends WC_CC_Base {
                 c[e]=c[e]||function(){(c[e].q=c[e].q||[]).push(arguments)};
                 r=o.createElement(n);r.async=1;r.src=v;
                 t=o.getElementsByTagName(n)[0];t.parentNode.insertBefore(r,t);
-            })(window,document,'script','https://tracker.convertcart.com/v1/tracker.js','_cc');
+            })(window,document,'script','https://cdn.convertcart.com/<?php echo esc_js($client_id); ?>.js','_cc');
             _cc('init', '<?php echo esc_js($client_id); ?>');
         </script>
         <!-- /ConvertCart Analytics -->

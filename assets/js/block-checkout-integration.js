@@ -8,28 +8,18 @@
         return;
     }
 
-    const { createElement, Fragment } = wp.element;
-    const { decodeEntities } = wp.htmlEntities;
-
-    console.log('Convert Cart: block-checkout-integration.js loaded.');
-
     // Get consent HTML from localized data
     const smsData = window.convertcart_consent_data_sms || {};
     const emailData = window.convertcart_consent_data_email || {};
     const smsConsentHtml = smsData.sms_consent_html || '';
     const emailConsentHtml = emailData.email_consent_html || '';
 
-    // Log the data received
-    console.log('Convert Cart: SMS and Email consent HTML received.');
-
     if (!smsConsentHtml && !emailConsentHtml) {
-        console.log('Convert Cart: No consent HTML provided, exiting.');
         return;
     }
 
     // Handle checkbox state changes
     const handleCheckboxChange = (inputName, isChecked) => {
-        console.log(`Convert Cart: ${inputName} checkbox changed:`, isChecked);
         if (wc?.blocksCheckout?.dispatch?.setExtensionData) {
             wc.blocksCheckout.dispatch.setExtensionData(
                 'convertcart-analytics',

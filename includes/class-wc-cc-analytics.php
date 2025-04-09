@@ -107,11 +107,8 @@ class WC_CC_Analytics extends WC_Integration {
      * Initialize hooks for components.
      */
     private function init_hooks(): void {
-        // Initialize component hooks only if Client ID is set
         $client_id = $this->get_option('cc_client_id');
         if (empty($client_id)) {
-            // Keep this important configuration log
-            error_log("ConvertCart Info: Client ID missing - frontend tracking disabled.");
             return;
         }
 
@@ -129,11 +126,6 @@ class WC_CC_Analytics extends WC_Integration {
             $this->tracking->init(); // Tracking hooks (wp_head, woocommerce_thankyou) added here
         }
         // EventManager constructor already calls its setup_hooks, so no ->init() needed here.
-
-        // REST Controller hooks (if used)
-        // if (isset($this->rest_controller)) {
-        //     $this->rest_controller->register_routes(); // Assuming this adds the necessary hooks
-        // }
     }
 
     /**
