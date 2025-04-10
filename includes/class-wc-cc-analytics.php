@@ -58,10 +58,10 @@ class WC_CC_Analytics extends WC_Integration {
     private string $plugin_version;
 
     /** @var string Client ID */
-    private string $cc_client_id;
+    private $cc_client_id;
 
     /** @var string Debug mode */
-    private string $debug_mode;
+    private $debug_mode;
 
     /**
      * Initialize the integration.
@@ -151,7 +151,9 @@ class WC_CC_Analytics extends WC_Integration {
 
         // Initialize consent handlers
         $this->sms_consent = new WC_CC_SMS_Consent($this, $this->plugin_url, $this->plugin_path, $this->plugin_version);
+        $this->sms_consent->init();
         $this->email_consent = new WC_CC_Email_Consent($this, $this->plugin_url, $this->plugin_path, $this->plugin_version);
+        $this->email_consent->init();
 
         // Initialize tracking
         $this->tracking = new WC_CC_Analytics_Tracking($this);
