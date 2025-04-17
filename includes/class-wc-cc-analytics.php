@@ -158,6 +158,52 @@ class WC_CC_Analytics extends WC_Integration {
         // Initialize tracking
         $this->tracking = new WC_CC_Analytics_Tracking($this);
         $this->tracking->init();
+
+        // Add action for standard script enqueuing
+        add_action('wp_enqueue_scripts', [$this, 'enqueue_checkout_scripts']);
+    }
+
+    /**
+     * Enqueue scripts and localize data for the checkout page.
+     * Renamed from register_block_checkout_integration for clarity.
+     */
+    public function enqueue_checkout_scripts(): void {
+        if (!is_checkout()) {
+            return;
+        }
+
+        $sms_consent_option = $this->get_option('enable_sms_consent', 'disabled');
+        $email_consent_option = $this->get_option('enable_email_consent', 'disabled');
+
+        $sms_consent_enabled = $sms_consent_option !== 'disabled';
+        $email_consent_enabled = $email_consent_option !== 'disabled';
+
+        if (!$sms_consent_enabled && !$email_consent_enabled) {
+            return;
+        }
+
+        wp_register_script(
+            'convertcart-blocks-integration',
+            $this->plugin_url . 'assets/js/block-checkout-integration.js',
+            ['jquery'],
+            $this->plugin_version,
+            true
+        );
+
+        $sms_html = $sms_consent_enabled ? get_option('cc_sms_consent_checkout_html', '') : '';
+        $email_html = $email_consent_enabled ? get_option('cc_email_consent_checkout_html', '') : '';
+
+        $data = [
+            'sms_enabled' => $sms_consent_enabled,
+            'email_enabled' => $email_consent_enabled,
+            'sms_consent_html' => $sms_html,
+            'email_consent_html' => $email_html,
+            'insertion_point' => '.woocommerce-terms-and-conditions-wrapper'
+        ];
+
+        wp_localize_script('convertcart-blocks-integration', 'convertcart_consent_data', $data);
+
+        wp_enqueue_script('convertcart-blocks-integration');
     }
 
     // *** Add getters if needed elsewhere, though direct passing is preferred ***
