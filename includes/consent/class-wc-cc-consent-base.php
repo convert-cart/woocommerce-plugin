@@ -347,29 +347,21 @@ abstract class WC_CC_Consent_Base extends WC_CC_Base {
     }
 
     /**
-     * Check if the current checkout page is using WooCommerce Blocks.
-     * Note: This detection might need refinement as WooCommerce evolves.
-     *
-     * @return bool True if Blocks checkout is detected, false otherwise.
+     * Check if the current checkout page uses blocks.
      */
     protected function is_blocks_checkout(): bool {
-        // Check 1: If the specific checkout block is rendered on the page
         if (function_exists('has_block') && has_block('woocommerce/checkout')) {
             return true;
         }
 
-        // Check 2: Look for body classes specific to block checkout themes/pages
-        // This is less reliable as classes can change
-        // $body_classes = get_body_class();
-        // if (in_array('is-block-theme', $body_classes) && is_checkout()) {
-        //     return true;
-        // }
+        return false;
+    }
 
-        // Check 3: Check if the block checkout script is enqueued (might run too late)
-        // if (wp_script_is('wc-blocks-checkout', 'enqueued')) {
-        //     return true;
-        // }
-
-        return false; // Default to classic if no block indicators found
+    /**
+     * Get checkout HTML template
+     */
+    public function get_checkout_html(): string {
+        $html = get_option('cc_' . $this->consent_type . '_consent_checkout_html', '');
+        return !empty($html) ? $html : $this->get_default_consent_html();
     }
 } 

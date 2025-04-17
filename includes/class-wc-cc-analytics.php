@@ -190,8 +190,8 @@ class WC_CC_Analytics extends WC_Integration {
             true
         );
 
-        $sms_html = $sms_consent_enabled ? get_option('cc_sms_consent_checkout_html', '') : '';
-        $email_html = $email_consent_enabled ? get_option('cc_email_consent_checkout_html', '') : '';
+        $sms_html = $sms_consent_enabled ? $this->sms_consent->get_checkout_html() : '';
+        $email_html = $email_consent_enabled ? $this->email_consent->get_checkout_html() : '';
 
         $data = [
             'sms_enabled' => $sms_consent_enabled,
@@ -202,11 +202,9 @@ class WC_CC_Analytics extends WC_Integration {
         ];
 
         wp_localize_script('convertcart-blocks-integration', 'convertcart_consent_data', $data);
-
         wp_enqueue_script('convertcart-blocks-integration');
     }
 
-    // *** Add getters if needed elsewhere, though direct passing is preferred ***
     public function get_plugin_url(): string {
         return $this->plugin_url;
     }

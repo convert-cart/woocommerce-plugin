@@ -25,6 +25,7 @@ const isClassicCheckout = () => {
 // Initialize based on checkout type
 const initializeCheckout = () => {
     const consentData = window.convertcart_consent_data || {};
+    console.log('ConvertCart consent data:', consentData); // Temporary debug log
 
     if (typeof consentData.sms_enabled === 'undefined' && typeof consentData.email_enabled === 'undefined') {
         return;
