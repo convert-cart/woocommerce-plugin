@@ -9,11 +9,11 @@ use WP_REST_Response;
 use WP_Error;
 
 /**
- * REST API controller for Convert Cart.
+ * REST API controller for Convert Cart Analytics.
  */
 class WC_CC_REST_Controller extends WC_CC_Base {
     /**
-     * Initialize hooks.
+     * Initialize REST API functionality.
      */
     public function init(): void {
         add_action('rest_api_init', [$this, 'register_routes']);
@@ -79,10 +79,10 @@ class WC_CC_REST_Controller extends WC_CC_Base {
      */
     public function get_plugin_info(): WP_REST_Response {
         return new WP_REST_Response([
-            'client_id' => $this->integration->get_option('cc_client_id'),
-            'debug_mode' => $this->integration->get_option('debug_mode'),
-            'sms_consent' => $this->integration->get_option('enable_sms_consent'),
-            'email_consent' => $this->integration->get_option('enable_email_consent'),
+            'client_id' => $this->get_option('cc_client_id'),
+            'debug_mode' => $this->get_option('debug_mode'),
+            'sms_consent' => $this->get_option('enable_sms_consent'),
+            'email_consent' => $this->get_option('enable_email_consent'),
         ]);
     }
 

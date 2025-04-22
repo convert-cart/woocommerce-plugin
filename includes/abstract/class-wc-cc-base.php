@@ -10,14 +10,14 @@ use WC_Integration;
  */
 abstract class WC_CC_Base {
     /**
-     * @var WC_Integration Parent integration instance
+     * @var WC_Integration
      */
-    protected WC_Integration $integration;
+    protected $integration;
 
     /**
      * Constructor.
      *
-     * @param WC_Integration $integration Parent integration instance
+     * @param WC_Integration $integration
      */
     public function __construct(WC_Integration $integration) {
         $this->integration = $integration;
@@ -29,14 +29,13 @@ abstract class WC_CC_Base {
     abstract public function init(): void;
 
     /**
-     * Get an option from the main integration settings.
+     * Get integration option.
      *
      * @param string $key Option key.
-     * @param mixed|null $default Default value if option not found.
-     * @return mixed Option value.
+     * @param mixed $default Default value.
+     * @return mixed
      */
-    protected function get_option(string $key, $default = null) {
-        // Delegate to the main integration's get_option method
+    protected function get_option(string $key, $default = '') {
         return $this->integration->get_option($key, $default);
     }
 

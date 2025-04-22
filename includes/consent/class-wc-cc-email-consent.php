@@ -64,22 +64,8 @@ class WC_CC_Email_Consent extends WC_CC_Consent_Base {
     }
 
     public function enqueue_scripts(): void {
-        if (!is_checkout() || $this->get_consent_mode() === 'disabled') {
-            return;
-        }
-
-        if ($this->is_blocks_checkout()) {
-            $script_handle = 'convertcart-block-checkout-integration';
-
-            $consent_html = $this->generate_checkbox_html();
-            wp_localize_script(
-                $script_handle,
-                'convertcart_consent_data_email',
-                ['email_consent_html' => $consent_html]
-            );
-
-        } else {
-        }
+        // Remove this method or ensure it's not being called
+        return;
     }
 
     protected function generate_checkbox_html(): string {

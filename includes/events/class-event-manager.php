@@ -272,4 +272,11 @@ class Event_Manager {
 	public function get_event_type( $event_name ) {
 		return $event_name;
 	}
+
+	/**
+	 * Initialize event management.
+	 */
+	public function init(): void {
+		// Add event management initialization here
+	}
 }

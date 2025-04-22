@@ -8,69 +8,52 @@ namespace ConvertCart\Analytics;
  */
 class WC_CC_Autoloader {
     /**
-     * Path to the includes directory.
-     *
-     * @var string
-     */
-    private string $include_path;
-
-    /**
      * The Constructor.
      */
     public function __construct() {
-        $this->include_path = dirname(__FILE__);
-        spl_autoload_register([$this, 'autoload']);
+        spl_autoload_register(array($this, 'autoload'));
     }
 
     /**
-     * Get the file name from the class name.
-     * e.g. WC_CC_Integration -> class-wc-cc-integration.php
-     *
-     * @param string $class Class name.
-     * @return string File name.
-     */
-    private function get_file_name_from_class(string $class): string {
-        return 'class-' . str_replace('_', '-', strtolower($class)) . '.php';
-    }
-
-    /**
-     * Include a class file.
-     *
-     * @param string $path File path.
-     * @return bool Success or failure.
-     */
-    private function load_file(string $path): bool {
-        if ($path && is_readable($path)) {
-            include_once $path;
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Auto-load WC classes on demand to reduce memory consumption.
+     * Auto-load classes on demand.
      *
      * @param string $class Class name.
      */
-    public function autoload(string $class): void {
-        // Only autoload classes from this plugin's namespace
-        if (0 !== strpos($class, __NAMESPACE__ . '\\')) {
+    public function autoload($class) {
+        $namespace = 'ConvertCart\\Analytics\\';
+        
+        // Return if the class is not in our namespace
+        if (strpos($class, $namespace) !== 0) {
             return;
         }
 
-        $relative_class = substr($class, strlen(__NAMESPACE__ . '\\'));
-        $relative_path = str_replace('\\', DIRECTORY_SEPARATOR, $relative_class);
-        $class_name = basename($relative_path);
-        $file_name = $this->get_file_name_from_class($class_name);
-
-        // Build the full path
-        $path = $this->include_path;
-        $dir_path = dirname($relative_path);
-        if ($dir_path !== '.') {
-            $path .= DIRECTORY_SEPARATOR . strtolower($dir_path); // Subdirectories are lowercase
+        // Remove namespace from class name and get the path
+        $class_path = str_replace($namespace, '', $class);
+        $class_parts = explode('\\', $class_path);
+        
+        // Get the actual class name (last part)
+        $class_name = array_pop($class_parts);
+        
+        // Convert class name format to file name format
+        $file_name = 'class-' . str_replace('_', '-', strtolower($class_name)) . '.php';
+        
+        // Build directory path from namespace parts
+        $directory_path = strtolower(implode('/', $class_parts));
+        
+        // Try to load from includes/subdirectory
+        if (!empty($directory_path)) {
+            $file_path = CONVERTCART_ANALYTICS_PATH . 'includes/' . $directory_path . '/' . $file_name;
+            if (file_exists($file_path)) {
+                require_once $file_path;
+                return;
+            }
         }
-        $full_path = $path . DIRECTORY_SEPARATOR . $file_name;
-
-        $this->load_file($full_path);
+        
+        // Try to load from includes directory
+        $file_path = CONVERTCART_ANALYTICS_PATH . 'includes/' . $file_name;
+        if (file_exists($file_path)) {
+            require_once $file_path;
+            return;
+        }
     }
 } 

@@ -53,27 +53,35 @@ abstract class WC_CC_Consent_Base extends WC_CC_Base {
         $this->plugin_url = $plugin_url;
         $this->plugin_path = $plugin_path;
         $this->plugin_version = $plugin_version;
+
+        // Comment out the validation hook
+        // add_action('woocommerce_after_checkout_validation', [$this, 'validate_checkout_consent'], 10, 2);
+        error_log("[ConvertCart] Consent validation hook TEMPORARILY DISABLED for {$this->consent_type}");
     }
 
     /**
      * Initialize hooks.
      */
     public function init(): void {
-        // Hooks for Registration and Account pages
+        // Add checkout-specific hooks for both classic and block checkout
+        add_action('woocommerce_checkout_create_order', [$this, 'save_consent_to_order'], 10, 2);
+        add_action('woocommerce_checkout_update_order_meta', [$this, 'save_consent_to_customer'], 10, 2);
+        
+        // Block checkout hooks with different signature
+        add_action('woocommerce_store_api_checkout_update_order_meta', function($order) {
+            $this->save_consent_to_order($order, []);
+        }, 10, 1);
+        
+        // Add validation
+        // add_action('woocommerce_checkout_process', [$this, 'validate_checkout_consent']); // Disable classic validation for testing
+        // add_action('woocommerce_store_api_checkout_update_order_from_request', [$this, 'validate_checkout_consent']); // Disable block validation for testing
+        error_log("[ConvertCart] Consent validation hooks in init() TEMPORARILY DISABLED for {$this->consent_type}");
+        
+        // Other hooks remain the same
         add_action('woocommerce_register_form', [$this, 'add_consent_to_registration_form']);
-
         add_action('woocommerce_edit_account_form', [$this, 'add_consent_checkbox_to_account_page']);
-
-
-        // Save consent hooks
-        add_action('woocommerce_checkout_create_order', [$this, 'save_consent_to_order_or_customer'], 10, 2);
-
         add_action('woocommerce_created_customer', [$this, 'save_consent_from_registration_form'], 10, 1);
-
         add_action('woocommerce_save_account_details', [$this, 'save_consent_from_account_page'], 12, 1);
-
-        // This hook might be redundant if checkout/registration covers account creation scenarios
-        add_action('woocommerce_created_customer', [$this, 'save_consent_when_account_is_created'], 10, 3);
     }
 
     /**
@@ -236,23 +244,78 @@ abstract class WC_CC_Consent_Base extends WC_CC_Base {
     }
 
     /**
-     * Save consent to order or customer.
+     * Save consent to order.
      *
      * @param \WC_Order $order
-     * @param array $data
+     * @param array $data Optional data array
      */
-    public function save_consent_to_order_or_customer(\WC_Order $order, array $data): void {
+    public function save_consent_to_order(\WC_Order $order, array $data = []): void {
+        error_log("[ConvertCart] Attempting to save {$this->consent_type} consent to order: " . $order->get_id());
+        
         if (!$this->is_consent_enabled()) {
+            error_log("[ConvertCart] {$this->consent_type} consent not enabled, skipping save");
             return;
         }
 
-        $consent = isset($_POST["{$this->consent_type}_consent"]) ? 'yes' : 'no';
-        $order->update_meta_data("{$this->consent_type}_consent", $consent);
+        $consent_key = "{$this->consent_type}_consent";
+        
+        // Try to get consent value from multiple sources
+        $consent = null;
+        
+        // Check POST data first
+        if (isset($_POST[$consent_key])) {
+            $consent = $_POST[$consent_key] === 'yes' ? 'yes' : 'no';
+            error_log("[ConvertCart] Found consent in POST data: $consent");
+        }
+        
+        // Check extension data from blocks
+        if ($consent === null && !empty($data['extension_data']['convertcart-analytics']['consent_data'][$consent_key])) {
+            $consent = $data['extension_data']['convertcart-analytics']['consent_data'][$consent_key] === 'yes' ? 'yes' : 'no';
+            error_log("[ConvertCart] Found consent in extension data: $consent");
+        }
+        
+        // Default to 'no' if no consent found
+        if ($consent === null) {
+            $consent = 'no';
+            error_log("[ConvertCart] No consent found, defaulting to: $consent");
+        }
 
-        // If user is logged in, also save to user meta
+        error_log("[ConvertCart] Saving {$this->consent_type} consent value: {$consent}");
+        $order->update_meta_data($consent_key, $consent);
+        
+        try {
+            $order->save();
+            error_log("[ConvertCart] Successfully saved consent to order");
+        } catch (\Exception $e) {
+            error_log("[ConvertCart] Error saving consent to order: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Save consent data to customer
+     */
+    public function save_consent_to_customer(int $order_id, array $data): void {
+        error_log("Attempting to save {$this->consent_type} consent to customer for order: {$order_id}");
+        
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            error_log("Order not found: {$order_id}");
+            return;
+        }
+        
+        if (!$this->is_consent_enabled()) {
+            error_log("{$this->consent_type} consent not enabled, skipping save");
+            return;
+        }
+
         $user_id = $order->get_customer_id();
+        error_log("Customer ID: {$user_id}");
+        
         if ($user_id > 0) {
-            update_user_meta($user_id, "{$this->consent_type}_consent", sanitize_text_field($consent));
+            $consent_key = "{$this->consent_type}_consent";
+            $consent = isset($_POST[$consent_key]) ? 'yes' : 'no';
+            error_log("Saving {$this->consent_type} consent value: {$consent} for user: {$user_id}");
+            update_user_meta($user_id, $consent_key, sanitize_text_field($consent));
         }
     }
 
@@ -363,5 +426,46 @@ abstract class WC_CC_Consent_Base extends WC_CC_Base {
     public function get_checkout_html(): string {
         $html = get_option('cc_' . $this->consent_type . '_consent_checkout_html', '');
         return !empty($html) ? $html : $this->get_default_consent_html();
+    }
+
+    /**
+     * Validate consent during checkout
+     */
+    public function validate_checkout_consent(): void {
+        error_log("Validating {$this->consent_type} consent");
+        
+        if (!$this->is_consent_enabled() || $this->get_consent_mode() !== 'live') {
+            return;
+        }
+
+        $consent_key = "{$this->consent_type}_consent";
+        $has_consent = false;
+        
+        // Check Store API data first
+        if (function_exists('wc_get_raw_store_api_checkout_data')) {
+            $checkout_data = wc_get_raw_store_api_checkout_data();
+            error_log('[ConvertCart] Store API checkout data: ' . print_r($checkout_data, true));
+            
+            if (!empty($checkout_data['extensions']['convertcart-analytics'][$consent_key])) {
+                $has_consent = $checkout_data['extensions']['convertcart-analytics'][$consent_key] === 'yes';
+                error_log("[ConvertCart] Found consent in Store API: " . ($has_consent ? 'yes' : 'no'));
+            }
+        }
+        
+        // Check POST data as backup
+        if (!$has_consent && isset($_POST[$consent_key])) {
+            $has_consent = $_POST[$consent_key] === 'yes';
+            error_log("[ConvertCart] Found consent in POST: " . ($has_consent ? 'yes' : 'no'));
+        }
+        
+        if (!$has_consent) {
+            wc_add_notice(
+                sprintf(
+                    __('Please review and accept the %s consent checkbox.', 'woocommerce_cc_analytics'),
+                    strtoupper($this->consent_type)
+                ),
+                'error'
+            );
+        }
     }
 } 

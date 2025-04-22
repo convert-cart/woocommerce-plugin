@@ -6,30 +6,58 @@ namespace ConvertCart\Analytics\Tracking;
 use ConvertCart\Analytics\Abstract\WC_CC_Base;
 use WC_Order;
 use Exception;
-use WC_Integration;
 
 /**
  * Handles analytics tracking functionality.
  */
 class WC_CC_Analytics_Tracking extends WC_CC_Base {
     /**
-     * Constructor.
-     *
-     * @param WC_Integration $integration
-     */
-    public function __construct(WC_Integration $integration) {
-        parent::__construct($integration);
-        // No init needed here as hooks are added in WC_CC_Analytics::init_hooks
-    }
-
-    /**
      * Initialize hooks.
-     * This method is called by WC_CC_Analytics::init_hooks if client ID is present.
      */
     public function init(): void {
         add_action('wp_head', [$this, 'add_tracking_script']);
         add_action('woocommerce_thankyou', [$this, 'track_order']);
         // Note: Other page-specific events (product, cart, etc.) are handled by Event_Manager via wp_footer
+
+        // Get plugin version from main plugin file or set a default
+        $version = $this->plugin->get_plugin_version();
+
+        // Enqueue WooCommerce dependencies first
+        wp_enqueue_script('wc-blocks-checkout');
+        wp_enqueue_script('wc-settings');
+        wp_enqueue_script('wc-blocks-data');
+
+        // Register our script with dependencies
+        wp_register_script(
+            'convertcart-blocks-integration',
+            plugins_url('assets/build/js/block-checkout-integration.js', dirname(__FILE__)),
+            array(
+                'wp-blocks',
+                'wp-element',
+                'wp-components',
+                'wp-i18n',
+                'wp-data',
+                'wc-blocks-checkout',
+                'wc-settings',
+                'wc-blocks-data'
+            ),
+            $version ?? '1.0.0', // Fallback version if not set
+            true
+        );
+
+        // Enqueue our script
+        wp_enqueue_script('convertcart-blocks-integration');
+
+        // Add script data
+        wp_localize_script(
+            'convertcart-blocks-integration',
+            'convertCartBlocksData',
+            array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('convertcart-blocks'),
+                // Add any other data your script needs
+            )
+        );
     }
 
     /**

@@ -1,0 +1,35 @@
+{
+  "name": "convertcart-analytics",
+  "version": "1.4.0",
+  "description": "Build process for ConvertCart Analytics plugin assets.",
+  "main": "build/block-checkout-integration.js",
+  "engines": {
+    "node": "18.x"
+  },
+  "scripts": {
+    "build": "wp-scripts build",
+    "start": "wp-scripts start",
+    "check-engines": "wp-scripts check-engines",
+    "lint:js": "wp-scripts lint-js assets/src/js",
+    "format:js": "wp-scripts format assets/src/js"
+  },
+  "keywords": [
+    "wordpress",
+    "plugin"
+  ],
+  "author": "Your Name or Company",
+  "license": "GPL-2.0-or-later",
+  "devDependencies": {
+    "@wordpress/scripts": "^26.0.0",
+    "@wordpress/babel-preset-default": "^7.23.0",
+    "babel-loader": "^9.1.3"
+  },
+  "dependencies": {
+    "@wordpress/components": "^25.4.0",
+    "@wordpress/data": "^9.8.0",
+    "@wordpress/element": "^5.15.0",
+    "@wordpress/html-entities": "^3.37.0",
+    "@wordpress/hooks": "^3.37.0",
+    "@wordpress/i18n": "^4.37.0"
+  }
+} 

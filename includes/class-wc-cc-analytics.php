@@ -10,6 +10,7 @@ use ConvertCart\Analytics\Consent\WC_CC_Email_Consent;
 use ConvertCart\Analytics\Tracking\WC_CC_Analytics_Tracking;
 use ConvertCart\Analytics\Events\Event_Manager;
 use WC_Integration;
+use ConvertCart\Analytics\Blocks\Blocks_Integration_Manager;
 
 /**
  * Main plugin class for Convert Cart Analytics.
@@ -31,12 +32,12 @@ class WC_CC_Analytics extends WC_Integration {
     /**
      * @var WC_CC_SMS_Consent
      */
-    private WC_CC_SMS_Consent $sms_consent;
+    public ?WC_CC_SMS_Consent $sms_consent = null;
 
     /**
      * @var WC_CC_Email_Consent
      */
-    private WC_CC_Email_Consent $email_consent;
+    public ?WC_CC_Email_Consent $email_consent = null;
 
     /**
      * @var WC_CC_Analytics_Tracking
@@ -63,10 +64,15 @@ class WC_CC_Analytics extends WC_Integration {
     /** @var string Debug mode */
     private $debug_mode;
 
+    /** @var Blocks_Integration_Manager */
+    private $blocks_manager;
+
     /**
      * Initialize the integration.
      */
     public function __construct() {
+        global $woocommerce;
+        
         $this->id = 'cc_analytics';
         $this->method_title = __('Convert Cart Analytics', 'woocommerce_cc_analytics');
         $this->method_description = __('Integrate Convert Cart Analytics with your WooCommerce store.', 'woocommerce_cc_analytics');
@@ -76,21 +82,19 @@ class WC_CC_Analytics extends WC_Integration {
         $this->plugin_path = CONVERTCART_ANALYTICS_PATH;
         $this->plugin_version = CONVERTCART_ANALYTICS_VERSION;
 
-        // Load the form fields
+        // Load the form fields and settings
         $this->init_form_fields();
-
-        // Load the settings
         $this->init_settings();
 
         // Get settings values
         $this->cc_client_id = $this->get_option('cc_client_id');
         $this->debug_mode = $this->get_option('debug_mode');
 
-        // Initialize components
-        $this->init_components();
-
         // Save settings
         add_action('woocommerce_update_options_integration_' . $this->id, array($this, 'process_admin_options'));
+
+        // Initialize components after settings are loaded
+        $this->init_components();
     }
 
     /**
@@ -159,50 +163,11 @@ class WC_CC_Analytics extends WC_Integration {
         $this->tracking = new WC_CC_Analytics_Tracking($this);
         $this->tracking->init();
 
-        // Add action for standard script enqueuing
-        add_action('wp_enqueue_scripts', [$this, 'enqueue_checkout_scripts']);
-    }
-
-    /**
-     * Enqueue scripts and localize data for the checkout page.
-     * Renamed from register_block_checkout_integration for clarity.
-     */
-    public function enqueue_checkout_scripts(): void {
-        if (!is_checkout()) {
-            return;
+        // Initialize blocks integration
+        if (class_exists('\Automattic\WooCommerce\Blocks\Package')) {
+            $this->blocks_manager = new Blocks_Integration_Manager($this);
+            $this->blocks_manager->init();
         }
-
-        $sms_consent_option = $this->get_option('enable_sms_consent', 'disabled');
-        $email_consent_option = $this->get_option('enable_email_consent', 'disabled');
-
-        $sms_consent_enabled = $sms_consent_option !== 'disabled';
-        $email_consent_enabled = $email_consent_option !== 'disabled';
-
-        if (!$sms_consent_enabled && !$email_consent_enabled) {
-            return;
-        }
-
-        wp_register_script(
-            'convertcart-blocks-integration',
-            $this->plugin_url . 'assets/js/block-checkout-integration.js',
-            ['jquery'],
-            $this->plugin_version,
-            true
-        );
-
-        $sms_html = $sms_consent_enabled ? $this->sms_consent->get_checkout_html() : '';
-        $email_html = $email_consent_enabled ? $this->email_consent->get_checkout_html() : '';
-
-        $data = [
-            'sms_enabled' => $sms_consent_enabled,
-            'email_enabled' => $email_consent_enabled,
-            'sms_consent_html' => $sms_html,
-            'email_consent_html' => $email_html,
-            'insertion_point' => '.woocommerce-terms-and-conditions-wrapper'
-        ];
-
-        wp_localize_script('convertcart-blocks-integration', 'convertcart_consent_data', $data);
-        wp_enqueue_script('convertcart-blocks-integration');
     }
 
     public function get_plugin_url(): string {
