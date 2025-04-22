@@ -1,4 +1,7 @@
 <?php
+if ( ! defined( 'CONVERTCART_PLUGIN_FILE' ) ) {
+    define( 'CONVERTCART_PLUGIN_FILE', __FILE__ );
+}
 /**
  * Plugin Name: ConvertCart Analytics for WooCommerce
  * Plugin URI: https://convertcart.com
@@ -76,6 +79,25 @@ function convertcart_analytics_init() {
 
 // Hook into the right action for integration registration
 add_action('woocommerce_loaded', 'convertcart_analytics_init');
+
+// Register Checkout Block Integration with WooCommerce Blocks (MailPoet pattern)
+add_action(
+    'woocommerce_blocks_checkout_block_registration',
+    function ($integration_registry) {
+        require_once __DIR__ . '/includes/blocks/class-checkout-block-integration.php';
+        // Get the plugin instance if needed
+        $plugin = null;
+        if (function_exists('wc') && method_exists(wc(), 'integrations')) {
+            $plugin = wc()->integrations->get_integration('cc_analytics');
+        }
+        if ($plugin) {
+            $integration_registry->register(new \ConvertCart\Analytics\Blocks\Checkout_Block_Integration($plugin));
+        } else {
+            error_log('[ConvertCart Blocks ERROR] Could not get valid plugin instance for Checkout_Block_Integration. Block integration not registered.');
+        }
+    }
+);
+
 
 // Register activation hook
 register_activation_hook(__FILE__, 'cc_analytics_activate');

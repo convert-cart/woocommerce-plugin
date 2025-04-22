@@ -6,6 +6,16 @@ use WC_Order;
 use WC_Store_API_Request;
 use ConvertCart\Analytics\WC_CC_Analytics; // Need access to main class type hint
 
+/**
+ * WooCommerce Blocks Checkout Integration for Consent Fields
+ *
+ * Implements the WooCommerce Blocks Extensibility API to inject consent checkboxes into the block-based checkout.
+ *
+ * Follows official docs:
+ * - https://developer.woocommerce.com/2022/06/28/introducing-the-woocommerce-blocks-extensibility-api/
+ * - https://woocommerce.com/document/woocommerce-blocks-extensibility/
+ */
+
 class Checkout_Block_Integration implements IntegrationInterface {
 
     /** @var string Script handle */
@@ -14,11 +24,15 @@ class Checkout_Block_Integration implements IntegrationInterface {
     /** @var WC_CC_Analytics Main plugin instance */
     private $plugin; // Changed: No longer nullable, must be provided
 
-    // Modify constructor to accept the plugin instance
-    public function __construct( WC_CC_Analytics $plugin_instance ) {
+    // Modify constructor to accept the plugin instance (optional)
+    public function __construct( WC_CC_Analytics $plugin_instance = null ) {
         error_log('[ConvertCart Blocks DEBUG] Checkout_Block_Integration constructor called.');
-        $this->plugin = $plugin_instance; // Assign the passed instance
-        error_log('[ConvertCart Blocks DEBUG] Main plugin instance successfully passed to constructor.');
+        $this->plugin = $plugin_instance; // May be null
+        if ($plugin_instance) {
+            error_log('[ConvertCart Blocks DEBUG] Main plugin instance successfully passed to constructor.');
+        } else {
+            error_log('[ConvertCart Blocks DEBUG] Main plugin instance NOT available in constructor.');
+        }
         // Remove the old lookup logic:
         // $integrations = class_exists('WC_Integrations') ? \WC()->integrations->get_integrations() : [];
         // $this->plugin = $integrations['cc_analytics'] ?? null;
@@ -45,7 +59,7 @@ class Checkout_Block_Integration implements IntegrationInterface {
         // Add script data
         wp_localize_script(
             self::SCRIPT_HANDLE,
-            'convertCartBlocksData',
+            'convertcart_consent_data',
             $script_data
         );
         error_log('[ConvertCart DEBUG] Script data localized');
@@ -82,14 +96,6 @@ class Checkout_Block_Integration implements IntegrationInterface {
             );
             error_log('[ConvertCart DEBUG] Registered script: ' . $script_url);
         }
-
-        // Register the script data
-        wp_localize_script(
-            self::SCRIPT_HANDLE,
-            'convertCartBlocksData',
-            $this->get_script_data()
-        );
-        error_log('[ConvertCart DEBUG] Localized script data');
     }
 
     public function get_script_handles(): array {
@@ -103,8 +109,19 @@ class Checkout_Block_Integration implements IntegrationInterface {
     }
 
     public function get_script_data(): array {
-        $sms_enabled = $this->plugin->get_option('enable_sms_consent', 'disabled') !== 'disabled';
-        $email_enabled = $this->plugin->get_option('enable_email_consent', 'disabled') !== 'disabled';
+        // Fallback to get_option if plugin instance is not available
+        $settings = get_option('woocommerce_cc_analytics_settings', array());
+        $sms_option = $settings['enable_sms_consent'] ?? 'not set';
+        $email_option = $settings['enable_email_consent'] ?? 'not set';
+        error_log('[ConvertCart DEBUG] woocommerce_cc_analytics_settings[enable_sms_consent]: ' . $sms_option);
+        error_log('[ConvertCart DEBUG] woocommerce_cc_analytics_settings[enable_email_consent]: ' . $email_option);
+
+        $sms_enabled = $this->plugin
+            ? $this->plugin->get_option('enable_sms_consent', 'disabled') !== 'disabled'
+            : $sms_option !== 'disabled' && $sms_option !== 'not set';
+        $email_enabled = $this->plugin
+            ? $this->plugin->get_option('enable_email_consent', 'disabled') !== 'disabled'
+            : $email_option !== 'disabled' && $email_option !== 'not set';
 
         error_log('[ConvertCart DEBUG] Consent states - SMS: ' . ($sms_enabled ? 'enabled' : 'disabled') . 
                   ', Email: ' . ($email_enabled ? 'enabled' : 'disabled'));
@@ -117,13 +134,25 @@ class Checkout_Block_Integration implements IntegrationInterface {
         return [
             'sms_enabled' => $sms_enabled,
             'email_enabled' => $email_enabled,
-            'sms_consent_html' => $sms_enabled ? $this->plugin->sms_consent->get_checkout_html() : '',
-            'email_consent_html' => $email_enabled ? $this->plugin->email_consent->get_checkout_html() : '',
+            'sms_consent_html' => ($sms_enabled
+                ? (
+                    $this->plugin && isset($this->plugin->sms_consent)
+                        ? $this->plugin->sms_consent->get_checkout_html()
+                        : get_option('cc_sms_consent_checkout_html', '')
+                  )
+                : ''),
+            'email_consent_html' => ($email_enabled
+                ? (
+                    $this->plugin && isset($this->plugin->email_consent)
+                        ? $this->plugin->email_consent->get_checkout_html()
+                        : get_option('cc_email_consent_checkout_html', '')
+                  )
+                : ''),
             'namespace' => 'convertcart-analytics'
         ];
     }
 
-    public function process_consent_from_extension_data(WC_Order $order, WC_Store_API_Request $request): void {
+    public function process_consent_from_extension_data(WC_Order $order, $request = null): void {
         $current_hook = current_filter();
         error_log("==> [ConvertCart Blocks DEBUG] process_consent_from_extension_data called for Order ID: " . $order->get_id() . " via hook: " . $current_hook);
 
@@ -134,11 +163,15 @@ class Checkout_Block_Integration implements IntegrationInterface {
         }
 
         try {
-            $extension_data = $request->get_extension_data();
-            $namespace = $this->get_name(); // Use the dynamic name
-            $consent_data = $extension_data[$namespace] ?? null;
-
-            error_log("==> [ConvertCart Blocks DEBUG] Request Extension Data: " . print_r($extension_data, true));
+            if ($request && method_exists($request, 'get_extension_data')) {
+                $extension_data = $request->get_extension_data();
+                $namespace = $this->get_name(); // Use the dynamic name
+                $consent_data = $extension_data[$namespace] ?? null;
+                error_log("==> [ConvertCart Blocks DEBUG] Request Extension Data: " . print_r($extension_data, true));
+            } else {
+                $consent_data = null;
+                error_log("==> [ConvertCart Blocks DEBUG] No extension data: request is null or does not support get_extension_data");
+            }
 
             if (empty($consent_data)) {
                 error_log('[ConvertCart Blocks DEBUG] No consent data found in extension data for namespace: ' . $namespace);

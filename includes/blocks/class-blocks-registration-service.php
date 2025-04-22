@@ -20,24 +20,16 @@ class Blocks_Registration_Service {
     }
 
     public function init(): void {
-        // Register scripts first, before any hooks
-        add_action('init', function() {
-            error_log('[ConvertCart DEBUG] Registering scripts on init...');
-            
-            // Check if files exist
-            $js_file = $this->plugin->get_plugin_path() . 'assets/build/js/block-checkout-integration.js';
-            $asset_file = $this->plugin->get_plugin_path() . 'assets/build/js/block-checkout-integration.asset.php';
-            
-            error_log('[ConvertCart DEBUG] Checking files:');
-            error_log('[ConvertCart DEBUG] JS file exists: ' . (file_exists($js_file) ? 'yes' : 'no') . ' at ' . $js_file);
-            error_log('[ConvertCart DEBUG] Asset file exists: ' . (file_exists($asset_file) ? 'yes' : 'no') . ' at ' . $asset_file);
-            
-            // Get plugin URLs for verification
-            error_log('[ConvertCart DEBUG] Plugin URL: ' . $this->plugin->get_plugin_url());
-            error_log('[ConvertCart DEBUG] Plugin Path: ' . $this->plugin->get_plugin_path());
-            
-            $this->register_frontend_scripts();
-        }, 5);
+        error_log('[ConvertCart DEBUG] Blocks_Registration_Service::init() called');
+        // Register scripts immediately to guarantee registration before enqueue
+        $this->register_frontend_scripts();
+        // Force enqueue script on checkout page
+        add_action('wp_enqueue_scripts', function() {
+            error_log('[ConvertCart DEBUG] Forcing enqueue of convertcart-blocks-integration on ALL front-end pages.');
+            error_log('[ConvertCart DEBUG] Script registered at enqueue: ' . (wp_script_is(self::SCRIPT_HANDLE, 'registered') ? 'yes' : 'no'));
+            wp_enqueue_script(self::SCRIPT_HANDLE);
+        }, 20);
+
 
         // Then hook into WooCommerce Blocks initialization
         add_action('woocommerce_blocks_loaded', function() {
@@ -56,6 +48,7 @@ class Blocks_Registration_Service {
                     error_log('[ConvertCart DEBUG] Before inline script - Script registered: ' . 
                         (wp_script_is(self::SCRIPT_HANDLE, 'registered') ? 'yes' : 'no'));
                     
+                    // Optionally, add inline script if needed for block filters (leave as is if required)
                     wp_add_inline_script(
                         'wc-blocks-checkout',
                         'window.wc = window.wc || {}; window.wc.blocksCheckout = window.wc.blocksCheckout || {};
@@ -97,30 +90,30 @@ class Blocks_Registration_Service {
             }
         });
 
-        // Enqueue scripts on checkout page
-        add_action('wp_enqueue_scripts', function() {
-            if (!is_checkout()) return;
-            
-            error_log('[ConvertCart DEBUG] Checkout page detected');
-            
-            if (!wp_script_is(self::SCRIPT_HANDLE, 'registered')) {
-                error_log('[ConvertCart DEBUG] Script not registered! Attempting registration...');
-                $this->register_frontend_scripts();
-                
-                // Check registration status after attempt
-                error_log('[ConvertCart DEBUG] Script registration status after attempt: ' . 
-                    (wp_script_is(self::SCRIPT_HANDLE, 'registered') ? 'success' : 'failed'));
+        // Register checkout block integration with WooCommerce Blocks
+        add_action('woocommerce_blocks_checkout_block_registration', function($integration_registry) {
+            error_log('[ConvertCart DEBUG] Entered woocommerce_blocks_checkout_block_registration callback');
+            if (!class_exists('ConvertCart\\Analytics\\Blocks\\Checkout_Block_Integration')) {
+                $integration_file = __DIR__ . '/class-checkout-block-integration.php';
+                if (file_exists($integration_file)) {
+                    require_once $integration_file;
+                    error_log('[ConvertCart DEBUG] Required Checkout_Block_Integration class file.');
+                } else {
+                    error_log('[ConvertCart ERROR] Checkout_Block_Integration class file missing: ' . $integration_file);
+                }
             }
-
-            if (function_exists('wc_get_page_id') && has_block('woocommerce/checkout', get_post(wc_get_page_id('checkout')))) {
-                error_log('[ConvertCart DEBUG] Block checkout detected, enqueueing script...');
-                wp_enqueue_script(self::SCRIPT_HANDLE);
-                
-                // Verify enqueue
-                error_log('[ConvertCart DEBUG] Script enqueued status: ' . 
-                    (wp_script_is(self::SCRIPT_HANDLE, 'enqueued') ? 'yes' : 'no'));
+            if (class_exists('ConvertCart\\Analytics\\Blocks\\Checkout_Block_Integration')) {
+                $integration = new Checkout_Block_Integration($this->plugin);
+                if (!$integration_registry->is_registered($integration->get_name())) {
+                    $integration_registry->register($integration);
+                    error_log('[ConvertCart DEBUG] Successfully registered checkout block integration.');
+                } else {
+                    error_log('[ConvertCart DEBUG] Integration already registered: ' . $integration->get_name());
+                }
+            } else {
+                error_log('[ConvertCart ERROR] Checkout_Block_Integration class not found after require.');
             }
-        }, 20);
+        });
     }
 
     private function register_frontend_scripts(): void {
@@ -138,22 +131,13 @@ class Blocks_Registration_Service {
         error_log('[ConvertCart DEBUG] Asset data: ' . print_r($asset_data, true));
 
         $script_url = $this->plugin->get_plugin_url() . 'assets/build/js/block-checkout-integration.js';
+        error_log('[ConvertCart DEBUG] About to register script with URL: ' . $script_url);
         error_log('[ConvertCart DEBUG] Script URL: ' . $script_url);
         
         wp_register_script(
             self::SCRIPT_HANDLE,
             $script_url,
-            array_merge($asset_data['dependencies'] ?? [], [
-                'wp-blocks',
-                'wp-i18n',
-                'wp-element',
-                'wp-components',
-                'wc-blocks-checkout',
-                'wc-settings',
-                'wp-data',
-                'react',
-                'wp-polyfill'
-            ]),
+            [], // No dependencies for testing
             $asset_data['version'] ?? $this->plugin->get_plugin_version(),
             true
         );

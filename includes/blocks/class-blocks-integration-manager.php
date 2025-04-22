@@ -22,7 +22,7 @@ class Blocks_Integration_Manager {
      * Initialize blocks integration.
      */
     public function init(): void {
-        // Hook late enough for WC to be fully loaded
+        // Only call legacy setup_blocks_integration if needed
         add_action('init', [$this, 'setup_blocks_integration'], 90);
     }
 

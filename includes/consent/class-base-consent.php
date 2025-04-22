@@ -409,20 +409,31 @@ abstract class Base_Consent {
 				$script_handle,
 				'convertcart_consent_data_' . $this->consent_type,
 				$consent_data
-			);
-		}
 	}
+}
 
-	/**
-	 * Setup classic checkout hooks
-	 */
-	protected function setup_classic_checkout_hooks() {
-		add_action('woocommerce_after_checkout_billing_form', array($this, 'add_consent_to_checkout'), 15);
-		add_action('woocommerce_checkout_update_order_meta', array($this, 'save_consent_from_checkout'), 10);
-	}
+/**
+ * Setup classic checkout hooks for consent fields.
+ *
+ * Follows WooCommerce best practices:
+ * - https://woocommerce.com/document/tutorial-customising-checkout-fields-using-actions-and-filters/
+ * - https://woocommerce.com/document/woocommerce-checkout/
+ *
+ * Hooks:
+ * - woocommerce_after_checkout_billing_form: Display custom consent fields.
+ * - woocommerce_checkout_update_order_meta: Save consent field values to order meta.
+ */
+protected function setup_classic_checkout_hooks() {
+	add_action('woocommerce_after_checkout_billing_form', array($this, 'add_consent_to_checkout'), 15);
+	add_action('woocommerce_checkout_update_order_meta', array($this, 'save_consent_from_checkout'), 10);
+}
 
-	/**
-	 * Add consent checkbox to checkout form
+/**
+ * Add consent checkbox to checkout form
+ */
+public function add_consent_to_checkout() {
+	echo $this->get_consent_html('checkout');
+}
 	 */
 	public function add_consent_to_checkout() {
 		echo $this->get_consent_html('checkout');

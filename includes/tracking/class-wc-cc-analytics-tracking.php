@@ -12,6 +12,23 @@ use Exception;
  */
 class WC_CC_Analytics_Tracking extends WC_CC_Base {
     /**
+     * Reference to main plugin instance.
+     *
+     * @var object
+     */
+    protected $plugin;
+
+    /**
+     * Constructor.
+     *
+     * @param object $plugin Main plugin instance
+     */
+    public function __construct($plugin) {
+        $this->plugin = $plugin;
+        parent::__construct($plugin);
+    }
+
+    /**
      * Initialize hooks.
      */
     public function init(): void {
