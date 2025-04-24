@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace ConvertCart\Analytics\Blocks;
 
+error_log('[ConvertCart DEBUG] TOP OF BLOCKS REGISTRATION SERVICE FILE EXECUTED');
+
 use Automattic\WooCommerce\Blocks\Integrations\IntegrationRegistry;
 
 class Blocks_Registration_Service {
@@ -103,7 +105,35 @@ class Blocks_Registration_Service {
                 }
             }
             if (class_exists('ConvertCart\\Analytics\\Blocks\\Checkout_Block_Integration')) {
-                $integration = new Checkout_Block_Integration($this->plugin);
+                $plugin = null;
+                error_log('[ConvertCart DEBUG] (Block Reg) About to check for registered integrations... (A)');
+                if (function_exists('wc')) {
+                    error_log('[ConvertCart DEBUG] (Block Reg) wc() exists. (B)');
+                    $wc_object = wc();
+                    if ($wc_object) {
+                        error_log('[ConvertCart DEBUG] (Block Reg) wc() returns object of class: ' . get_class($wc_object) . ' (C)');
+                        if (method_exists($wc_object, 'integrations')) {
+                            error_log('[ConvertCart DEBUG] (Block Reg) wc()->integrations exists. (D)');
+                            $integrations = $wc_object->integrations->get_integrations();
+                            error_log('[ConvertCart DEBUG] Raw integrations array: ' . print_r($integrations, true));
+                            if (is_array($integrations) && count($integrations) === 0) {
+                                error_log('[ConvertCart DEBUG] Integrations array is EMPTY.');
+                            }
+                            error_log('[ConvertCart DEBUG] Integration IDs: ' . print_r(array_map(function($i) { return method_exists($i, 'get_id') ? $i->get_id() : get_class($i); }, $integrations), true));
+                            error_log('[ConvertCart DEBUG] Attempting to get integration with ID: cc_analytics');
+                            $plugin = $wc_object->integrations->get_integration('cc_analytics');
+                        } else {
+                            error_log('[ConvertCart DEBUG] (Block Reg) wc()->integrations method does NOT exist. (E)');
+                        }
+                    } else {
+                        error_log('[ConvertCart DEBUG] (Block Reg) wc() returns null/false. (F)');
+                    }
+                } else {
+                    error_log('[ConvertCart DEBUG] (Block Reg) function wc() does NOT exist. (G)');
+                }
+                error_log('[ConvertCart DEBUG] (Block Reg) About to log (H)');
+                error_log('[ConvertCart DEBUG] Finished attempting to get plugin instance. (H)');
+                $integration = new Checkout_Block_Integration($plugin);
                 if (!$integration_registry->is_registered($integration->get_name())) {
                     $integration_registry->register($integration);
                     error_log('[ConvertCart DEBUG] Successfully registered checkout block integration.');

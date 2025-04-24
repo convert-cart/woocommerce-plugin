@@ -53,6 +53,7 @@ function cc_is_woocommerce_active(): bool {
 /**
  * Initialize the plugin
  */
+
 function convertcart_analytics_init() {
     // Only initialize if WooCommerce is active
     if (!cc_is_woocommerce_active()) {
@@ -69,52 +70,110 @@ function convertcart_analytics_init() {
 
     // Add the integration
     add_filter('woocommerce_integrations', function($integrations) {
-        if (!class_exists('ConvertCart\Analytics\WC_CC_Analytics')) {
-            return $integrations;
+        error_log('[ConvertCart DEBUG] woocommerce_integrations filter running.');
+        $class_file = CONVERTCART_ANALYTICS_PATH . 'includes/class-wc-cc-analytics.php';
+        if (!class_exists('ConvertCart\\Analytics\\WC_CC_Analytics')) {
+            if (file_exists($class_file)) {
+                require_once $class_file;
+                error_log('[ConvertCart DEBUG] Required class-wc-cc-analytics.php manually.');
+            } else {
+                error_log('[ConvertCart DEBUG] class-wc-cc-analytics.php file not found!');
+            }
         }
-        $integrations[] = 'ConvertCart\Analytics\WC_CC_Analytics';
+        if (class_exists('ConvertCart\\Analytics\\WC_CC_Analytics')) {
+            error_log('[ConvertCart DEBUG] About to instantiate WC_CC_Analytics.');
+            $instance = new \ConvertCart\Analytics\WC_CC_Analytics();
+            error_log('[ConvertCart DEBUG] Instantiated WC_CC_Analytics: ' . print_r($instance, true));
+            $integrations[] = $instance;
+            error_log('[ConvertCart DEBUG] Registered ConvertCart\\Analytics\\WC_CC_Analytics integration (as object).');
+        } else {
+            error_log('[ConvertCart DEBUG] WC_CC_Analytics class STILL not loaded after require!');
+        }
+        // Log all integration types
+        foreach ($integrations as $i) {
+            error_log('[ConvertCart DEBUG] Integration in array: ' . (is_object($i) ? get_class($i) : gettype($i)));
+        }
         return $integrations;
     });
+
 }
 
 // Hook into the right action for integration registration
 add_action('woocommerce_loaded', 'convertcart_analytics_init');
 
-// Register Checkout Block Integration with WooCommerce Blocks (MailPoet pattern)
+// Register Checkout Block Integration with WooCommerce Blocks only after WooCommerce is fully initialized
 add_action(
-    'woocommerce_blocks_checkout_block_registration',
-    function ($integration_registry) {
-        require_once __DIR__ . '/includes/blocks/class-checkout-block-integration.php';
-        // Get the plugin instance if needed
-        $plugin = null;
-        if (function_exists('wc') && method_exists(wc(), 'integrations')) {
-            $plugin = wc()->integrations->get_integration('cc_analytics');
-        }
-        if ($plugin) {
-            $integration_registry->register(new \ConvertCart\Analytics\Blocks\Checkout_Block_Integration($plugin));
-        } else {
-            error_log('[ConvertCart Blocks ERROR] Could not get valid plugin instance for Checkout_Block_Integration. Block integration not registered.');
-        }
-    }
-);
-
-
-// Register activation hook
-register_activation_hook(__FILE__, 'cc_analytics_activate');
-
-/**
- * Plugin activation hook
- */
-function cc_analytics_activate() {
-    if (!cc_is_woocommerce_active()) {
-        deactivate_plugins(plugin_basename(__FILE__));
-        wp_die(
-            esc_html__('Convert Cart Analytics requires WooCommerce to be installed and active.', 'woocommerce_cc_analytics'),
-            'Plugin dependency check',
-            ['back_link' => true]
+    'woocommerce_init',
+    function () {
+        add_action(
+            'woocommerce_blocks_checkout_block_registration',
+            function ($integration_registry) {
+                require_once __DIR__ . '/includes/blocks/class-checkout-block-integration.php';
+                // Get the plugin instance if needed
+                $plugin = null;
+                error_log('[ConvertCart DEBUG] (Block Reg) About to check for registered integrations... (A)');
+                if (function_exists('wc')) {
+                    error_log('[ConvertCart DEBUG] (Block Reg) wc() exists. (B)');
+                    $wc_object = wc();
+                    if ($wc_object) {
+                        error_log('[ConvertCart DEBUG] (Block Reg) wc() returns object of class: ' . get_class($wc_object) . ' (C)');
+                        global $woocommerce;
+                        if (isset($woocommerce) && isset($woocommerce->integrations)) {
+                            error_log('[ConvertCart DEBUG] (Block Reg) Using global $woocommerce->integrations for lookup.');
+                            $integrations = $woocommerce->integrations->get_integrations();
+                            error_log('[ConvertCart DEBUG] Raw integrations array: ' . print_r($integrations, true));
+                            if (is_array($integrations) && count($integrations) === 0) {
+                                error_log('[ConvertCart DEBUG] Integrations array is EMPTY.');
+                            }
+                            error_log('[ConvertCart DEBUG] Integration IDs: ' . print_r(array_map(function($i) { return method_exists($i, 'get_id') ? $i->get_id() : get_class($i); }, $integrations), true));
+                            foreach ($integrations as $integration) {
+                                if (!is_object($integration)) {
+                                    if (is_string($integration) && class_exists($integration) && is_subclass_of($integration, 'WC_Integration')) {
+                                        $integration = new $integration();
+                                    } else {
+                                        error_log('[ConvertCart DEBUG] Integration entry is not an object: ' . print_r($integration, true));
+                                        continue;
+                                    }
+                                }
+                                if (method_exists($integration, 'get_id')) {
+                                    $id = $integration->get_id();
+                                    error_log('[ConvertCart DEBUG] Checking integration with get_id(): ' . $id);
+                                    if ($id === 'cc_analytics') {
+                                        $plugin = $integration;
+                                        error_log('[ConvertCart DEBUG] Found cc_analytics integration via global $woocommerce. Plugin instance: ' . print_r($plugin, true));
+                                        break;
+                                    }
+                                } else {
+                                    error_log('[ConvertCart DEBUG] Integration object does not have get_id(): ' . get_class($integration));
+                                }
+                            }
+                        } else {
+                            error_log('[ConvertCart DEBUG] (Block Reg) $woocommerce->integrations not available.');
+                        }
+                    } else {
+                        error_log('[ConvertCart DEBUG] (Block Reg) wc() returns null/false. (F)');
+                    }
+                } else {
+                    error_log('[ConvertCart DEBUG] (Block Reg) function wc() does NOT exist. (G)');
+                }
+                error_log('[ConvertCart DEBUG] (Block Reg) About to log (H)');
+                error_log('[ConvertCart DEBUG] Finished attempting to get plugin instance. (H)');
+                if ($plugin) {
+                    error_log('[ConvertCart DEBUG] About to instantiate Checkout_Block_Integration with plugin instance.');
+                    $integration = new \ConvertCart\Analytics\Blocks\Checkout_Block_Integration($plugin);
+                    if (!$integration_registry->is_registered($integration->get_name())) {
+                        $integration_registry->register($integration);
+                        error_log('[ConvertCart DEBUG] Successfully registered checkout block integration.');
+                    } else {
+                        error_log('[ConvertCart DEBUG] Integration already registered: ' . $integration->get_name());
+                    }
+                } else {
+                    error_log('[ConvertCart Blocks ERROR] Could not get valid plugin instance for Checkout_Block_Integration. Block integration not registered.');
+                }
+            }
         );
     }
-}
+);
 
 // Add admin notice if WooCommerce is not active
 add_action('admin_notices', function() {
