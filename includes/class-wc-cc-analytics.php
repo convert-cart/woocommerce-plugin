@@ -14,6 +14,13 @@ namespace ConvertCart\Analytics;
 use WP_REST_Request;
 
 class WC_CC_Analytics extends \WC_Integration {
+	/**
+	 * Settings properties to avoid dynamic property deprecation.
+	 */
+	public $debug_mode;
+	public $enable_sms_consent;
+	public $enable_email_consent;
+	// Add more properties here if you add more settings fields in the future.
 
 
 
@@ -28,7 +35,7 @@ class WC_CC_Analytics extends \WC_Integration {
 	 * Init and hook in the integration.
 	 */
 	public function __construct() {
-		global $woocommerce;
+
 		$this->id                 = 'cc_analytics';
 		$this->method_title       = __( 'CC Analytics Settings', 'woocommerce_cc_analytics' );
 		$this->method_description = __( 'Contact Convert Cart To Get Client ID / Domain Id', 'woocommerce_cc_analytics' );
@@ -231,7 +238,9 @@ class WC_CC_Analytics extends \WC_Integration {
 		$this->settings = get_option( $this->plugin_id . $this->id . '_settings', null );
 		if ( is_array( $this->settings ) ) {
 			foreach ( $this->settings as $key => $value ) {
-				$this->$key = $value;
+				if ( property_exists( $this, $key ) ) {
+					$this->$key = $value;
+				}
 			}
 		}
 	}
@@ -499,7 +508,7 @@ class WC_CC_Analytics extends \WC_Integration {
 	 */
 	public function getMetaInfo() {
 		global $wp_version;
-		global $woocommerce;
+
 		global $current_user;
 
 		$meta_data = array();
@@ -518,7 +527,7 @@ class WC_CC_Analytics extends \WC_Integration {
 
 		$debug_mode = $this->get_option( 'debug_mode' );
 		if ( 'yes' === $debug_mode ) {
-			$meta_data['pv'] = is_object( $woocommerce ) ? $woocommerce->version : null;
+			$meta_data['pv'] = ( function_exists( 'WC' ) && is_object( WC() ) ) ? WC()->version : null;
 			$meta_data['wv'] = $wp_version;
 		}
 		$meta_data['pgv'] = defined( 'CC_PLUGIN_VERSION' ) ? CC_PLUGIN_VERSION : null;
@@ -617,10 +626,10 @@ class WC_CC_Analytics extends \WC_Integration {
 	 */
 	public function getVersionList( $request ) {
 		global $wp_version;
-		global $woocommerce;
+
 		$info               = array();
 		$info['wp_version'] = $wp_version;
-		$info['wc_version'] = is_object( $woocommerce ) ? $woocommerce->version : null;
+		$info['wc_version'] = ( function_exists( 'WC' ) && is_object( WC() ) ) ? WC()->version : null;
 		return $info;
 	}
 
@@ -1336,10 +1345,10 @@ class WC_CC_Analytics extends \WC_Integration {
 	public function get_plugin_info() {
 		global $wpdb;
 		global $wp_version;
-		global $woocommerce;
+
 		$info               = array();
 		$info['wp_version'] = $wp_version;
-		$info['wc_plugin_version'] = is_object( $woocommerce ) ? $woocommerce->version : null;
+		$info['wc_plugin_version'] = ( function_exists( 'WC' ) && is_object( WC() ) ) ? WC()->version : null;
 		$info['cc_plugin_version'] = defined( 'CC_PLUGIN_VERSION' ) ? CC_PLUGIN_VERSION : null;  // Add plugin version
 		$webhooks           = $wpdb->get_results(
 			$wpdb->prepare(

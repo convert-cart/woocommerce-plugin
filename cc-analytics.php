@@ -9,6 +9,11 @@
  * Stable Tag: 1.3.2
  * License: GPLv2 or later
  * Tags: conversion rate optimization, conversion, revenue boost
+ * Requires at least: 5.6
+ * Requires PHP: 7.0
+ * WC requires at least: 6.0
+ * WC tested up to: 6.5.5
+ * WC_HPOS: true
  *
  * @package WC_CC_Analytics
  */
@@ -17,6 +22,16 @@ namespace ConvertCart\Analytics;
 
 defined( 'ABSPATH' ) || exit;
 
+// HPOS compatibility declaration for WooCommerce 7.1+
+add_action( 'before_woocommerce_init', function() {
+    if ( class_exists( '\\Automattic\\WooCommerce\\Utilities\\FeaturesUtil' ) ) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+            'custom_order_tables',
+            __FILE__,
+            true
+        );
+    }
+} );
 /**
  * Add the integration to WooCommerce
  *
@@ -28,8 +43,8 @@ function add_integration( $integrations ) {
 		define( 'CC_PLUGIN_VERSION', '1.2.4' );
 	}
 
-	global $woocommerce;
-	if ( is_object( $woocommerce ) ) {
+	// Use WC() singleton instead of global $woocommerce for modern compatibility
+	if ( function_exists( 'WC' ) && is_object( WC() ) ) {
 		$integration_path = plugin_dir_path( __FILE__ ) . 'includes/class-wc-cc-analytics.php';
 
 		if ( file_exists( $integration_path ) ) {
