@@ -20,9 +20,6 @@ class WC_CC_Analytics extends \WC_Integration {
 	public $debug_mode;
 	public $enable_sms_consent;
 	public $enable_email_consent;
-	// Add more properties here if you add more settings fields in the future.
-
-
 
 	/**
 	 * Client ID.
