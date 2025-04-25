@@ -42,8 +42,6 @@ class WC_CC_Email_Consent extends WC_CC_Consent_Base {
         add_action('woocommerce_review_order_before_submit', [$this, 'display_consent_checkbox'], 10);
 
         add_action('woocommerce_checkout_update_order_meta', [$this, 'save_consent_data'], 10, 2);
-
-        add_action('wp_enqueue_scripts', [$this, 'enqueue_scripts']);
     }
 
     public function display_consent_checkbox(): void {
