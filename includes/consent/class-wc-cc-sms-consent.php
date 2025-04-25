@@ -64,38 +64,9 @@ class WC_CC_SMS_Consent extends WC_CC_Consent_Base {
     }
 
     public function enqueue_scripts(): void {
+        // Only enqueue JS for block-based checkout. Do nothing for classic checkout.
         if (!is_checkout() || $this->get_consent_mode() === 'disabled') {
             return;
-        }
-
-        if ($this->is_blocks_checkout()) {
-            if (empty($this->plugin_url) || empty($this->plugin_path)) {
-                return;
-            }
-
-            $script_handle = 'convertcart-block-checkout-integration';
-            $script_path = $this->plugin_url . 'assets/js/block-checkout-integration.js';
-            $script_asset_path = $this->plugin_path . 'assets/js/block-checkout-integration.asset.php';
-            $script_asset = file_exists($script_asset_path)
-                ? require($script_asset_path)
-                : ['dependencies' => [], 'version' => $this->plugin_version];
-
-            wp_enqueue_script(
-                $script_handle,
-                $script_path,
-                $script_asset['dependencies'],
-                $script_asset['version'],
-                true
-            );
-
-            $consent_html = $this->generate_checkbox_html();
-            wp_localize_script(
-                $script_handle,
-                'convertcart_consent_data_sms',
-                ['sms_consent_html' => $consent_html]
-            );
-
-        } else {
         }
     }
 
