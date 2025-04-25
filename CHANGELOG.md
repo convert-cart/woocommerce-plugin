@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.3] - 2025-04-25
+### Added
+- Added HPOS compatibility declaration for WooCommerce 7.1+.
+- Replaced deprecated WordPress/WooCommerce functions.
+
 ## [1.3.2] - 2025-03-07
 ### Added
 - Added email consent feature for account page, registeration page, checkout page.
