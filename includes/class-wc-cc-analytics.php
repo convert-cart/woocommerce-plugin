@@ -295,7 +295,7 @@ class WC_CC_Analytics extends \WC_Integration {
 				$event_info['total']    = $order->get_total();
 				$event_info['currency'] = get_woocommerce_currency();
 				$event_info['status']   = $order->get_status();
-				$promos                 = $order->get_used_coupons();
+				$promos                 = $order->get_coupon_codes();
 
 				if ( is_array( $promos ) ) {
 					$event_info['coupon_code'] = isset( $promos[0] ) ? $promos[0] : null;
@@ -306,7 +306,7 @@ class WC_CC_Analytics extends \WC_Integration {
 
 				foreach ( $line_items as $item ) {
 					$order_item = array();
-					$product    = $order->get_product_from_item( $item );
+					$product    = $item->get_product();
 					if ( ! is_object( $product ) ) {
 						continue;
 					}
