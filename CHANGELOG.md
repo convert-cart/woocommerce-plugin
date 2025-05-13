@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.4] - 2025-05-13
+### Fixed
+- Replaced few deprecated WordPress/WooCommerce functions.
+
 ## [1.3.3] - 2025-04-25
 ### Added
 - Added HPOS compatibility declaration for WooCommerce 7.1+.
