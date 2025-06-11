@@ -24,13 +24,13 @@ defined( 'ABSPATH' ) || exit;
 
 // HPOS compatibility declaration for WooCommerce 7.1+
 add_action( 'before_woocommerce_init', function() {
-    if ( class_exists( '\\Automattic\\WooCommerce\\Utilities\\FeaturesUtil' ) ) {
-        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
-            'custom_order_tables',
-            __FILE__,
-            true
-        );
-    }
+	if ( class_exists( '\\Automattic\\WooCommerce\\Utilities\\FeaturesUtil' ) ) {
+		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+			'custom_order_tables',
+			__FILE__,
+			true
+		);
+	}
 } );
 /**
  * Add the integration to WooCommerce
@@ -51,12 +51,23 @@ function add_integration( $integrations ) {
 			include_once $integration_path;
 			$integrations[] = 'ConvertCart\Analytics\WC_CC_Analytics';
 		} elseif ( defined( 'WP_DEBUG' ) && WP_DEBUG === true ) {
-            // phpcs:disable WordPress.PHP.DevelopmentFunctions
+			// phpcs:disable WordPress.PHP.DevelopmentFunctions
 			error_log( 'WC_CC_Analytics integration file not found: ' . $integration_path );
-            // phpcs:enable
+			// phpcs:enable
 		}
 	}
 
 	return $integrations;
 }
 add_filter( 'woocommerce_integrations', 'ConvertCart\Analytics\add_integration', 10 );
+
+// Add custom cron schedule for 6 hours if not present
+add_filter('cron_schedules', function ($schedules) {
+	if (!isset($schedules['six_hours'])) {
+		$schedules['six_hours'] = [
+			'interval' => 6 * 3600,
+			'display'  => __('Every 6 Hours'),
+		];
+	}
+	return $schedules;
+});
