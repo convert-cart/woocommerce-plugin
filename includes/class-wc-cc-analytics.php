@@ -295,7 +295,7 @@ class WC_CC_Analytics extends \WC_Integration {
 		$this->generate_settings_html();
 		echo '</table>';
 		// Show info about cron job
-		if ( ! empty( $this->flycart_discount_user_ids ) ) {
+		if ( ! empty( $this->flycart_discount_user_ids )  && is_plugin_active('woo-discount-rules/woo-discount-rules.php') ) {
 			echo '<p><strong>Cron job is enabled for user IDs:</strong> ' . esc_html( $this->flycart_discount_user_ids ) . '</p>';
 		}
 	}
