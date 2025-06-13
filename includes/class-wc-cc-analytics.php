@@ -235,14 +235,16 @@ class WC_CC_Analytics extends \WC_Integration {
 			),
 		);
 
-		// Add flycart_discount_user_ids field for backward compatibility
-		$this->form_fields['flycart_discount_user_ids'] = array(
-			'title'       => __( 'Flycart Discount User IDs', 'woocommerce_cc_analytics' ),
-			'type'        => 'text',
-			'description' => __( 'Comma-separated user IDs for Flycart discount sync. Leave empty to disable.', 'woocommerce_cc_analytics' ),
-			'desc_tip'    => true,
-			'default'     => '',
-		);
+		// Add flycart_discount_user_id field if flycart is enabled 
+        if ( is_plugin_active( 'woo-discount-rules/woo-discount-rules.php' ) ) {
+            $this->form_fields['flycart_discount_user_ids'] = array(
+                'title'       => __( 'Flycart Discount User IDs', 'woocommerce_cc_analytics' ),
+                'type'        => 'text',
+                'description' => __( 'Comma-separated user IDs for Flycart discount sync. Leave empty to disable.', 'woocommerce_cc_analytics' ),
+                'desc_tip'    => true,
+                'default'     => '',
+            );
+        }
 	}
 
 	/**
@@ -267,7 +269,7 @@ class WC_CC_Analytics extends \WC_Integration {
 	 * Save admin options and handle Flycart cron logic
 	 */
 	public function process_admin_options() {
-		$prev_user_ids = get_option( 'flycart_discount_user_ids', '' );
+		$prev_user_ids = $this->get_option( 'flycart_discount_user_ids', '' );
 		parent::process_admin_options();
 		$new_user_ids = $this->get_option( 'flycart_discount_user_ids', '' );
 
@@ -303,33 +305,43 @@ class WC_CC_Analytics extends \WC_Integration {
 	 */
 	public static function flycart_register_cron() {
 		if ( ! wp_next_scheduled( 'flycart_user_discount_cron_hook' ) ) {
-			wp_schedule_event( time(), 'six_hours', 'flycart_user_discount_cron_hook' );
-		}
-	}
-
+			wp_schedule_event( time(), 'two_hours', 'flycart_user_discount_cron_hook' );
+            echo "Flycart cron registered.\n";
+		} 
+    }
 	/**
 	 * Clear cron event on plugin deactivation
 	 */
 	public static function flycart_clear_cron() {
 		wp_clear_scheduled_hook( 'flycart_user_discount_cron_hook' );
+        echo "Flycart cron cleared.\n";
 	}
 
 	/**
 	 * Cron logic for Flycart user-based discount sync
 	 */
 	public function flycart_user_discount_cron() {
-		if ( ! has_filter( 'advanced_woo_discount_rules_get_product_discount_price' ) ) return;
-		if ( ! $user_ids_raw ) {
-			// Fallback to option if not set in settings
-			$user_ids_raw = get_option( 'flycart_discount_user_ids', '' );
+		if ( ! has_filter( 'advanced_woo_discount_rules_get_product_discount_price' ) ) {
+			return;
 		}
-		if ( empty( $user_ids_raw ) ) return;
+
+		$user_ids_raw = $this->get_option('flycart_discount_user_ids', '');
+        if (empty($user_ids_raw)) {
+            $user_ids_raw = get_option('flycart_discount_user_ids', '');
+        }
+		if ( empty( $user_ids_raw ) ) {
+			return;
+		}
 
 		$user_ids = array_filter( array_map( 'intval', explode( ',', $user_ids_raw ) ) );
-		if ( empty( $user_ids ) ) return;
+		if ( empty( $user_ids ) ) {
+			return;
+		}
+
+        $current_user_id = get_current_user_id();
 
 		$product_ids = get_posts([
-			'post_type'      => 'product',
+			'post_type'      => ['product', 'product_variation'],
 			'posts_per_page' => -1,
 			'post_status'    => 'publish',
 			'fields'         => 'ids',
@@ -337,13 +349,19 @@ class WC_CC_Analytics extends \WC_Integration {
 
 		foreach ( $user_ids as $user_id ) {
 			$user = get_userdata( $user_id );
-			if ( ! $user ) continue;
+			if ( ! $user ) {
+				continue;
+			}
 
 			wp_set_current_user( $user_id );
 
+
+
 			foreach ( $product_ids as $product_id ) {
 				$product = wc_get_product( $product_id );
-				if ( ! $product ) continue;
+				if ( ! $product ) {
+					continue;
+				}
 
 				$discounted_price = apply_filters(
 					'advanced_woo_discount_rules_get_product_discount_price',
@@ -351,18 +369,25 @@ class WC_CC_Analytics extends \WC_Integration {
 					$product
 				);
 
-				$meta_key = '_flycart_discounted_price_user_' . $user_id;
-				$old_price = get_post_meta( $product_id, $meta_key, true );
-				$new_price = wc_format_decimal( $discounted_price, wc_get_price_decimals() );
-
-				if ( $old_price && $old_price !== $new_price ) {
-					update_post_meta( $product_id, $meta_key, $new_price );
+				if ( $discounted_price === false || $discounted_price === null ) {
+					continue;
 				}
+
+				$new_price = wc_format_decimal( $discounted_price, wc_get_price_decimals() );
+				$meta_key = '_flycart_discounted_price_user_' . $user_id;
+				$old_price = wc_format_decimal( get_post_meta( $product_id, $meta_key, true ), wc_get_price_decimals() );
+
+				if ( !$old_price && $new_price ) {
+                    update_post_meta( $product_id, $meta_key, $new_price );
+                    wp_update_post( [ 'ID' => $product_id ] );
+                } else if ( $old_price !== $new_price ) {
+                    update_post_meta( $product_id, $meta_key, $new_price );
+                    wp_update_post( [ 'ID' => $product_id ] );
+                }
 			}
 		}
 
-		// Reset current user to avoid conflicts
-		wp_set_current_user( 0 );
+		wp_set_current_user( $current_user_id );
 	}
 
 	/**
