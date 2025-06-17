@@ -305,7 +305,7 @@ class WC_CC_Analytics extends \WC_Integration {
 	 */
 	public static function flycart_register_cron() {
 		if ( ! wp_next_scheduled( 'flycart_user_discount_cron_hook' ) ) {
-			wp_schedule_event( time(), 'two_hours', 'flycart_user_discount_cron_hook' );
+			wp_schedule_event( time(), 'one_hours', 'flycart_user_discount_cron_hook' );
 			echo "Flycart cron registered.\n";
 		} 
 	}

@@ -63,10 +63,10 @@ add_filter( 'woocommerce_integrations', 'ConvertCart\Analytics\add_integration',
 
 // Add custom cron schedule for 6 hours if not present
 add_filter('cron_schedules', function ($schedules) {
-	if (!isset($schedules['six_hours'])) {
-		$schedules['six_hours'] = [
+	if (!isset($schedules['one_hours'])) {
+		$schedules['one_hours'] = [
 			'interval' => 6 * 3600,
-			'display'  => __('Every 6 Hours'),
+			'display'  => __('Every 1 Hours'),
 		];
 	}
 	return $schedules;
