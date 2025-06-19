@@ -175,6 +175,7 @@ class WC_CC_Analytics extends \WC_Integration {
 		add_action( 'woocommerce_review_order_before_submit', array( $this, 'add_sms_consent_checkbox' ) );
 		add_action( 'woocommerce_review_order_before_submit', array( $this, 'add_email_consent_checkbox' ) );
 		add_action( 'woocommerce_checkout_create_order', array( $this, 'save_sms_consent_to_order_or_customer' ), 10, 2 );
+        add_action( 'woocommerce_checkout_create_order', array( $this, 'save_email_consent_to_order_or_customer' ), 10, 2 );
 		add_action( 'woocommerce_update_product', array( $this, 'handle_woocommerce_update_product' ), 20, 1 );
 		add_action( 'woocommerce_created_customer', array( $this, 'save_sms_consent_when_account_is_created' ), 10, 3 );
 		add_action( 'woocommerce_created_customer', array( $this, 'save_email_consent_when_account_is_created' ), 10, 3 );
@@ -373,8 +374,6 @@ class WC_CC_Analytics extends \WC_Integration {
 			}
 
 			wp_set_current_user( $user_id );
-
-
 
 			foreach ( $product_ids as $product_id ) {
 				$product = wc_get_product( $product_id );
