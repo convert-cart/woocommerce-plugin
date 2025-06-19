@@ -20,6 +20,7 @@ class WC_CC_Analytics extends \WC_Integration {
 	public $debug_mode;
 	public $enable_sms_consent;
 	public $enable_email_consent;
+	public $flycart_discount_user_ids;
 
 	/**
 	 * Client ID.
@@ -43,11 +44,18 @@ class WC_CC_Analytics extends \WC_Integration {
 
 		// Define user set variables.
 		$this->cc_client_id = $this->get_option( 'cc_client_id' );
+		$this->flycart_discount_user_ids = $this->get_option( 'flycart_discount_user_ids', '' );
 		add_action( 'woocommerce_update_options_integration_' . $this->id, array( $this, 'process_admin_options' ) );
 
 		if ( ! isset( $this->cc_client_id ) || '' === $this->cc_client_id ) {
 			return;
 		}
+
+		// Register cron on activation/deactivation
+		register_activation_hook( WC_CC_Analytics::get_plugin_file(), array( __CLASS__, 'flycart_register_cron' ) );
+		register_deactivation_hook( WC_CC_Analytics::get_plugin_file(), array( __CLASS__, 'flycart_clear_cron' ) );
+
+		add_action( 'flycart_user_discount_cron_hook', array( $this, 'flycart_user_discount_cron' ) );
 
 		// Actions added below.
 		add_action( 'wp_head', array( $this, 'cc_init' ) );
@@ -167,7 +175,8 @@ class WC_CC_Analytics extends \WC_Integration {
 		add_action( 'woocommerce_review_order_before_submit', array( $this, 'add_sms_consent_checkbox' ) );
 		add_action( 'woocommerce_review_order_before_submit', array( $this, 'add_email_consent_checkbox' ) );
 		add_action( 'woocommerce_checkout_create_order', array( $this, 'save_sms_consent_to_order_or_customer' ), 10, 2 );
-		add_action( 'woocommerce_checkout_create_order', array( $this, 'save_email_consent_to_order_or_customer' ), 10, 2 );
+        add_action( 'woocommerce_checkout_create_order', array( $this, 'save_email_consent_to_order_or_customer' ), 10, 2 );
+		add_action( 'woocommerce_update_product', array( $this, 'handle_woocommerce_update_product' ), 20, 1 );
 		add_action( 'woocommerce_created_customer', array( $this, 'save_sms_consent_when_account_is_created' ), 10, 3 );
 		add_action( 'woocommerce_created_customer', array( $this, 'save_email_consent_when_account_is_created' ), 10, 3 );
 		add_action( 'woocommerce_edit_account_form', array( $this, 'add_sms_consent_checkbox_to_account_page' ) );
@@ -195,7 +204,7 @@ class WC_CC_Analytics extends \WC_Integration {
 				'description' => __( 'Contact Convert Cart To Get Client ID / Domain Id', 'woocommerce_cc_analytics' ),
 				'desc_tip'    => true,
 				'default'     => '',
-			),
+			),			
 			'debug_mode'         => array(
 				'title'       => __( 'Enable Debug Mode', 'woocommerce_cc_analytics' ),
 				'type'        => 'checkbox',
@@ -226,6 +235,17 @@ class WC_CC_Analytics extends \WC_Integration {
 				'default'     => 'disabled',
 			),
 		);
+
+		// Add flycart_discount_user_id field if flycart is enabled 
+		if ( is_plugin_active( 'woo-discount-rules/woo-discount-rules.php' ) ) {
+			$this->form_fields['flycart_discount_user_ids'] = array(
+				'title'       => __( 'Flycart Discount User IDs', 'woocommerce_cc_analytics' ),
+				'type'        => 'text',
+				'description' => __( 'Comma-separated user IDs for Flycart discount sync. Leave empty to disable.', 'woocommerce_cc_analytics' ),
+				'desc_tip'    => true,
+				'default'     => '',
+			);
+		}
 	}
 
 	/**
@@ -240,6 +260,30 @@ class WC_CC_Analytics extends \WC_Integration {
 				}
 			}
 		}
+		// Also load flycart_discount_user_ids if set as option (for backward compatibility)
+		if ( empty( $this->flycart_discount_user_ids  ) ) {
+			$this->flycart_discount_user_ids = get_option( 'flycart_discount_user_ids', '' );
+		}
+	}
+
+	/**
+	 * Save admin options and handle Flycart cron logic
+	 */
+	public function process_admin_options() {
+		$prev_user_ids = $this->get_option( 'flycart_discount_user_ids', '' );
+		parent::process_admin_options();
+		$new_user_ids = $this->get_option( 'flycart_discount_user_ids', '' );
+
+		// If value becomes empty, clear the cron job
+		if ( empty( $new_user_ids ) ) {
+			self::flycart_clear_cron();
+		}
+
+		// If previously empty and now set, run job immediately and schedule cron
+		if ( empty( $prev_user_ids ) && ! empty( $new_user_ids ) || $prev_user_ids !== $new_user_ids ) {
+			$this->flycart_user_discount_cron();
+			self::flycart_register_cron();
+		}
 	}
 
 	/**
@@ -251,6 +295,175 @@ class WC_CC_Analytics extends \WC_Integration {
 		echo '<table class="form-table">';
 		$this->generate_settings_html();
 		echo '</table>';
+		// Show info about cron job
+		if ( ! empty( $this->flycart_discount_user_ids )  && is_plugin_active('woo-discount-rules/woo-discount-rules.php') ) {
+			echo '<p><strong>Cron job is enabled for user IDs:</strong> ' . esc_html( $this->flycart_discount_user_ids ) . '</p>';
+		}
+	}
+
+	/**
+	 * Register cron event on plugin activation
+	 */
+	public static function flycart_register_cron() {
+		if ( ! wp_next_scheduled( 'flycart_user_discount_cron_hook' ) ) {
+			wp_schedule_event( time(), 'one_hours', 'flycart_user_discount_cron_hook' );
+			echo "Flycart cron registered.\n";
+		} 
+	}
+	/**
+	 * Clear cron event on plugin deactivation
+	 */
+	public static function flycart_clear_cron() {
+		wp_clear_scheduled_hook( 'flycart_user_discount_cron_hook' );
+		echo "Flycart cron cleared.\n";
+	}
+
+    /**
+     * Handles the woocommerce_update_product action.
+     *
+     * @param WC_Product $product The product object.
+     */
+    public function handle_woocommerce_update_product( $post_id ) {
+        // Skip during autosave or AJAX
+        if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
+        if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) return;
+
+        if ( ! function_exists( 'is_plugin_active' ) ) {
+            include_once( ABSPATH . 'wp-admin/includes/plugin.php' );
+        }
+        // You may want to check for permissions here too
+        if ( method_exists( $this, 'flycart_user_discount_for_product_update_create' ) && is_plugin_active('woo-discount-rules/woo-discount-rules.php') ) {
+            $this->flycart_user_discount_for_product_update_create( $post_id );
+        }
+    }
+
+	/**
+	 * Cron logic for Flycart user-based discount sync
+	 */
+	public function flycart_user_discount_cron() {
+		if ( ! has_filter( 'advanced_woo_discount_rules_get_product_discount_price' ) ) {
+			return;
+		}
+
+		$user_ids_raw = $this->get_option('flycart_discount_user_ids', '');
+		if (empty($user_ids_raw)) {
+			$user_ids_raw = get_option('flycart_discount_user_ids', '');
+		}
+		if ( empty( $user_ids_raw ) ) {
+			return;
+		}
+
+		$user_ids = array_filter( array_map( 'intval', explode( ',', $user_ids_raw ) ) );
+		if ( empty( $user_ids ) ) {
+			return;
+		}
+
+		$current_user_id = get_current_user_id();
+
+		$product_ids = get_posts([
+			'post_type'      => ['product', 'product_variation'],
+			'posts_per_page' => -1,
+			'post_status'    => 'publish',
+			'fields'         => 'ids',
+		]);
+
+		foreach ( $user_ids as $user_id ) {
+			$user = get_userdata( $user_id );
+			if ( ! $user ) {
+				continue;
+			}
+
+			wp_set_current_user( $user_id );
+
+			foreach ( $product_ids as $product_id ) {
+				$product = wc_get_product( $product_id );
+				if ( ! $product ) {
+					continue;
+				}
+
+				$discounted_price = apply_filters(
+					'advanced_woo_discount_rules_get_product_discount_price',
+					$product->get_price(),
+					$product
+				);
+
+				if ( $discounted_price === false || $discounted_price === null ) {
+					continue;
+				}
+
+				$new_price = wc_format_decimal( $discounted_price, wc_get_price_decimals() );
+				$meta_key = '_flycart_discounted_price_user_' . $user_id;
+				$old_price = wc_format_decimal( get_post_meta( $product_id, $meta_key, true ), wc_get_price_decimals() );
+
+				if ( !$old_price && $new_price ) {
+					update_post_meta( $product_id, $meta_key, $new_price );
+					wp_update_post( [ 'ID' => $product_id ] );
+				} else if ( $old_price !== $new_price ) {
+					update_post_meta( $product_id, $meta_key, $new_price );
+					wp_update_post( [ 'ID' => $product_id ] );
+				}
+			}
+		}
+
+		wp_set_current_user( $current_user_id );
+	}
+
+	public function flycart_user_discount_for_product_update_create( $product_id ) {
+        if ( ! has_filter( 'advanced_woo_discount_rules_get_product_discount_price' ) ) {
+			return;
+		}
+		$user_ids_raw = $this->get_option('flycart_discount_user_ids', '');
+		if (empty($user_ids_raw)) {
+			$user_ids_raw = get_option('flycart_discount_user_ids', '');
+		}
+		if ( empty( $user_ids_raw ) ) {
+			return;
+		}
+		$user_ids = array_filter( array_map( 'intval', explode( ',', $user_ids_raw ) ) );
+		if ( empty( $user_ids ) ) {
+			return;
+		}
+		$current_user_id = get_current_user_id();
+		foreach ( $user_ids as $user_id ) {
+			$user = get_userdata( $user_id );
+			if ( ! $user ) {
+				continue;
+			}
+			wp_set_current_user( $user_id );
+			$product = wc_get_product( $product_id );
+			if ( ! $product ) {
+				continue;
+			}
+			$discounted_price = apply_filters(
+				'advanced_woo_discount_rules_get_product_discount_price',
+				$product->get_price(),
+				$product
+			);
+			if ( $discounted_price === false || $discounted_price === null ) {
+				continue;
+			}
+			$new_price = wc_format_decimal( $discounted_price, wc_get_price_decimals() );
+			$meta_key = '_flycart_discounted_price_user_' . $user_id;
+			$old_price = wc_format_decimal( get_post_meta( $product_id, $meta_key, true ), wc_get_price_decimals() );
+			if ( !$old_price && $new_price ) {
+				update_post_meta( $product_id, $meta_key, $new_price );
+			} else if ( $old_price !== $new_price ) {
+				update_post_meta( $product_id, $meta_key, $new_price );
+			}
+		}
+		wp_set_current_user( $current_user_id );
+	}
+
+	/**
+	 * Helper to get plugin file for activation/deactivation hooks
+	 */
+	public static function get_plugin_file() {
+		// Try to find the main plugin file
+		if ( defined( 'WC_CC_ANALYTICS_FILE' ) ) {
+			return WC_CC_ANALYTICS_FILE;
+		}
+		// Fallback: try to guess based on this file's location
+		return dirname( __FILE__, 2 ) . '/cc-analytics.php';
 	}
 
 	/**
@@ -707,12 +920,12 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-    /**
-     * Saves SMS consent to order or customer.
-     *
-     * @param int $order_id The order ID.
-     * @return void
-     */
+	/**
+	 * Saves SMS consent to order or customer.
+	 *
+	 * @param int $order_id The order ID.
+	 * @return void
+	 */
 	public function add_email_consent_checkbox() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_email_consent'] ) && ( 'live' === $options['enable_email_consent'] ) ) {
@@ -762,11 +975,11 @@ class WC_CC_Analytics extends \WC_Integration {
 	}
 
 	/**
-     * Saves email consent to order or customer.
-     *
-     * @param int $order_id The order ID.
-     * @return void
-     */
+	 * Saves email consent to order or customer.
+	 *
+	 * @param int $order_id The order ID.
+	 * @return void
+	 */
 	public function save_email_consent_to_order_or_customer( $order, $data ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_email_consent'] ) && 'live' === $options['enable_email_consent'] ) {
@@ -788,11 +1001,11 @@ class WC_CC_Analytics extends \WC_Integration {
 	}
 
 	/**
-     * Saves SMS consent when account is created.
-     *
-     * @param int $customer_id The customer ID.
-     * @return void
-     */
+	 * Saves SMS consent when account is created.
+	 *
+	 * @param int $customer_id The customer ID.
+	 * @return void
+	 */
 	public function add_email_consent_checkbox_to_account_page() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_email_consent'] ) && ( 'live' === $options['enable_email_consent'] ) ) {
@@ -830,12 +1043,12 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-    /**
-     * Saves email consent when account is created.
-     *
-     * @param int $customer_id The customer ID.
-     * @return void
-     */
+	/**
+	 * Saves email consent when account is created.
+	 *
+	 * @param int $customer_id The customer ID.
+	 * @return void
+	 */
 	public function save_email_consent_when_account_is_created( $customer_id, $new_customer_data, $password_generated ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_email_consent'] ) && 'live' === $options['enable_email_consent'] ) {
@@ -872,12 +1085,12 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-    /**
-     * Saves SMS consent from account page.
-     *
-     * @param int $user_id The user ID.
-     * @return void
-     */
+	/**
+	 * Saves SMS consent from account page.
+	 *
+	 * @param int $user_id The user ID.
+	 * @return void
+	 */
 	public function save_sms_consent_from_account_page( $user_id ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_sms_consent'] ) && ( $options['enable_sms_consent'] === 'live' ) ) {
@@ -887,12 +1100,12 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-    /**
-     * Saves email consent from account page.
-     *
-     * @param int $user_id The user ID.
-     * @return void
-     */
+	/**
+	 * Saves email consent from account page.
+	 *
+	 * @param int $user_id The user ID.
+	 * @return void
+	 */
 	public function save_email_consent_from_account_page( $user_id ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_email_consent'] ) && ( 'live' === $options['enable_email_consent'] ) ) {
@@ -902,11 +1115,11 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-    /**
-     * Adds SMS consent checkbox to registration form.
-     *
-     * @return void
-     */
+	/**
+	 * Adds SMS consent checkbox to registration form.
+	 *
+	 * @return void
+	 */
 	public function add_sms_consent_to_registration_form() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_sms_consent'] ) && ( $options['enable_sms_consent'] === 'live' ) ) {
@@ -924,12 +1137,12 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-    /**
-     * Saves SMS consent from registration form.
-     *
-     * @param int $customer_id The customer ID.
-     * @return void
-     */
+	/**
+	 * Saves SMS consent from registration form.
+	 *
+	 * @param int $customer_id The customer ID.
+	 * @return void
+	 */
 	public function add_email_consent_to_registration_form() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_email_consent'] ) && ( 'live' === $options['enable_email_consent'] ) ) {
@@ -943,12 +1156,12 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-    /**
-     * Saves email consent from registration form.
-     *
-     * @param int $customer_id The customer ID.
-     * @return void
-     */
+	/**
+	 * Saves email consent from registration form.
+	 *
+	 * @param int $customer_id The customer ID.
+	 * @return void
+	 */
 	public function save_email_consent_from_registration_form( $customer_id ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_email_consent'] ) && 'live' === $options['enable_email_consent'] ) {
@@ -960,12 +1173,12 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-    /**
-     * Saves SMS consent from registration form.
-     *
-     * @param int $customer_id The customer ID.
-     * @return void
-     */
+	/**
+	 * Saves SMS consent from registration form.
+	 *
+	 * @param int $customer_id The customer ID.
+	 * @return void
+	 */
 	public function save_sms_consent_from_registration_form( $customer_id ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_sms_consent'] ) && $options['enable_sms_consent'] === 'live' ) {
@@ -977,12 +1190,12 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-    /**
-     * Updates SMS consent from previous orders.
-     *
-     * @param int $customer_id The customer ID.
-     * @return void
-     */
+	/**
+	 * Updates SMS consent from previous orders.
+	 *
+	 * @param int $customer_id The customer ID.
+	 * @return void
+	 */
 	public function update_consent_from_previous_orders( $customer_id, $new_customer_data, $password_generated ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_sms_consent'] ) && $options['enable_sms_consent'] === 'live' ) {
@@ -1007,14 +1220,14 @@ class WC_CC_Analytics extends \WC_Integration {
 				}
 			}
 		}
-    }
+	}
 
-    /**
-     * Updates email consent from previous orders.
-     *
-     * @param int $customer_id The customer ID.
-     * @return void
-     */
+	/**
+	 * Updates email consent from previous orders.
+	 *
+	 * @param int $customer_id The customer ID.
+	 * @return void
+	 */
 	public function update_consent_from_previous_orders_email( $customer_id, $new_customer_data, $password_generated ) {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 		if ( isset( $options['enable_email_consent'] ) && 'live' === $options['enable_email_consent'] ) {
@@ -1041,11 +1254,11 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-    /**
-     * Adds Convert Cart menu to the admin dashboard.
-     *
-     * @return void
-     */
+	/**
+	 * Adds Convert Cart menu to the admin dashboard.
+	 *
+	 * @return void
+	 */
 	public function add_convert_cart_menu() {
 		$options = get_option( 'woocommerce_cc_analytics_settings' );
 
@@ -1076,11 +1289,11 @@ class WC_CC_Analytics extends \WC_Integration {
 		}
 	}
 
-    /**
-     * Enqueues CodeMirror assets for the Convert Cart settings page.
-     *
-     * @return void
-     */
+	/**
+	 * Enqueues CodeMirror assets for the Convert Cart settings page.
+	 *
+	 * @return void
+	 */
 	public function enqueue_codemirror_assets() {
 		wp_enqueue_code_editor( array( 'type' => 'text/html' ) );
 		wp_enqueue_script( 'wp-theme-plugin-editor' );
@@ -1357,5 +1570,5 @@ class WC_CC_Analytics extends \WC_Integration {
 
 		$info['webhooks'] = $webhooks;
 		return $info;
-    }
+	}
 }
