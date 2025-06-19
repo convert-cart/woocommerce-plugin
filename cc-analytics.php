@@ -65,7 +65,7 @@ add_filter( 'woocommerce_integrations', 'ConvertCart\Analytics\add_integration',
 add_filter('cron_schedules', function ($schedules) {
 	if (!isset($schedules['one_hours'])) {
 		$schedules['one_hours'] = [
-			'interval' => 6 * 3600,
+			'interval' => 1 * 3600,
 			'display'  => __('Every 1 Hours'),
 		];
 	}
