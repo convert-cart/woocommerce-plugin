@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.5] - 2025-06-19
+### Added
+- Added support to store Flycart discounted price in product meta based on user IDs.
+- Scheduled hourly cron to update discounted prices for existing products.
+
 ## [1.3.4] - 2025-05-13
 ### Fixed
 - Replaced few deprecated WordPress/WooCommerce functions.
