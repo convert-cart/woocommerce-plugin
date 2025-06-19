@@ -4,9 +4,9 @@
  * Description: Official Convert Cart Analytics WordPress plugin that transforms abandoned carts into product pages, tracks user behavior, provides detailed analytics, and optimizes your store for increased conversions and revenue.
  * Author: Convert Cart
  * Author URI: https://www.convertcart.com/
- * Version: 1.3.5
+ * Version: 1.3.5-beta
  * Tested up to: 6.5.5
- * Stable Tag: 1.3.5
+ * Stable Tag: 1.3.5-beta
  * License: GPLv2 or later
  * Tags: conversion rate optimization, conversion, revenue boost
  * Requires at least: 5.6

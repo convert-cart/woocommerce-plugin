@@ -2,7 +2,7 @@
     "name": "convert-cart/wordpress-analytics",
     "description": "Convert Cart Analytics plugin for frontend tracking and backend synchronization.",
     "type": "wordpress-plugin",
-    "version": "1.3.5",
+    "version": "1.3.5-beta",
     "license": [
       "OSL-3.0",
       "AFL-3.0"
