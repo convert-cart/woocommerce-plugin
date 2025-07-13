@@ -1,0 +1,26 @@
+{
+    "apiVersion": 3,
+    "name": "convertcart/sms-consent",
+    "version": "1.0.0",
+    "title": "ConvertCart SMS Consent",
+    "category": "convertcart",
+    "description": "Track user consent for SMS communications",
+    "supports": {
+        "html": false,
+        "align": false,
+        "multiple": false,
+        "reusable": false,
+        "inserter": false
+    },
+    "attributes": {
+        "lock": {
+            "type": "object",
+            "default": {
+                "remove": true,
+                "move": false
+            }
+        }
+    },
+    "parent": ["woocommerce/checkout-contact-information-block"],
+    "textdomain": "convertcart"
+}

@@ -1,0 +1,9 @@
+/* SMS Consent Block Styles */
+.wc-block-checkout__sms-consent {
+  margin: 1em 0;
+}
+
+.wp-block-convertcart-sms-consent-placeholder {
+  padding: 1em;
+  text-align: center;
+}

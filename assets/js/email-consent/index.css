@@ -1,0 +1,9 @@
+/* Email Consent Block Styles */
+.wc-block-checkout__email-consent {
+  margin: 1em 0;
+}
+
+.wp-block-convertcart-email-consent-placeholder {
+  padding: 1em;
+  text-align: center;
+}
