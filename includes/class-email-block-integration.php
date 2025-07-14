@@ -65,10 +65,32 @@ class ConvertCart_Email_Consent_Block_Integration implements IntegrationInterfac
 
     public function get_script_data() {
         $options = get_option('woocommerce_cc_analytics_settings', array());
+        $emailConsent=  isset( $options['enable_email_consent'] ) && ( 'live' === $options['enable_email_consent'] ) ? true : false;
+        $html = get_option('cc_email_consent_checkout_html', '');
+        // Check if HTML is not empty then take out the text from it
+        $text = !empty($html) ? strip_tags($html) : __('I agree to receive marketing emails from this store.', 'convertcart');
+        // If the text is empty, use a default message
+        if (empty($text)) {
+            $text = __('I agree to receive marketing emails from this store.', 'convertcart');
+        }
+        // Ensure the text is sanitized
+        $text = sanitize_text_field($text);
+        // Return the data for the block
+        if (defined('WP_DEBUG') && WP_DEBUG === true) {
+            error_log('ConvertCart: Email consent block data prepared with text: ' . $text
+            . ', trackingEnabled: ' . ($emailConsent ? 'true' : 'false'));
+        }
+        if ( is_user_logged_in() ) {
+            // Here we only need the consent data from user meta
+            $user_email_consent = get_user_meta( get_current_user_id(), 'email_consent', true );
+        } else {
+            $user_email_consent = false; // Default to false for non-logged-in users
+        }
+        // Return the data array
         return array(
-            'defaultText'      => __('I consent to email communications.', 'convertcart'),
-            'trackingEnabled'  => !empty($options['cc_client_id']),
-            'settings'         => $options
+            'defaultText'      => __($text, 'convertcart'),
+            'trackingEnabled'  => $emailConsent,
+            'consent'          => $user_email_consent === 'yes' ? true : false,
         );
     }
 

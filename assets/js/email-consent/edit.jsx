@@ -12,7 +12,8 @@ import { Icon, megaphone } from '@wordpress/icons';
 const adminUrl = getSetting('adminUrl', '');
 const settings = getSetting('convertcart-email-consent_data', {
     trackingEnabled: false,
-    defaultText: 'I consent to Email communications.'
+    defaultText: 'I consent to Email communications.',
+    consent: false
 });
 
 // Debug log to see what's being retrieved
@@ -25,7 +26,8 @@ if (typeof window !== 'undefined' && window.console) {
 
 const { 
     trackingEnabled = false, 
-    defaultText = 'I consent to Email communications.' 
+    defaultText = 'I consent to Email communications.',
+    consent = false
 } = settings;
 
 function EmptyState() {
