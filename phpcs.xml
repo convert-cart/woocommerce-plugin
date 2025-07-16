@@ -1,18 +1,37 @@
 <?xml version="1.0"?>
 <ruleset name="CC Analytics">
-    <description>PHP CodeSniffer rules for CC Analytics WordPress plugin.</description>
+    <description>PHP CodeSniffer rules for CC Analytics WordPress plugin with WooCommerce naming conventions.</description>
 
     <!-- Include the WordPress Coding Standards -->
     <rule ref="WordPress">
         <exclude name="Squiz.Commenting.ClassComment"/>
     </rule>
 
+    <!-- Configure WordPress.Files.FileName to allow WooCommerce naming conventions -->
+    <rule ref="WordPress.Files.FileName">
+        <properties>
+            <!-- Disable strict class file naming to allow class-wc-cc-* patterns -->
+            <property name="strict_class_file_names" value="false"/>
+        </properties>
+    </rule>
+
     <!-- Define the files and directories to include in the code sniffing process -->
     <file>cc-analytics.php</file>
     <file>includes/class-wc-cc-analytics.php</file>
+    <file>includes/class-cc-consent-manager.php</file>
+    <file>includes/class-cc-event-tracker.php</file>
+    <file>includes/class-cc-discount-manager.php</file>
+    <file>includes/class-cc-admin-ui.php</file>
+    <file>includes/class-cc-rest-api.php</file>
+    <file>includes/class-convertcart-sms-consent-block-integration.php</file>
+    <file>includes/class-convertcart-email-consent-block-integration.php</file>
 
     <!-- Exclude any directories or files that should not be checked -->
     <exclude-pattern>vendor/*</exclude-pattern>
+    <!-- Exclude generated asset files from filename validation -->
+    <exclude-pattern>assets/dist/js/*/*.asset.php</exclude-pattern>
+    <!-- Exclude minified JavaScript files -->
+    <exclude-pattern>assets/dist/js/*/*.js</exclude-pattern>
 
     <!-- 1 - less critical issues, 10 - most critical issues -->
     <arg name="severity" value="1"/>
