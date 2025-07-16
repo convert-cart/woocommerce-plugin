@@ -1,3 +1,9 @@
+/**
+ * SMS Consent Block Attributes
+ *
+ * @package ConvertCart\Analytics
+ */
+
 import { getSetting } from '@woocommerce/settings';
 
 const { defaultText } = getSetting(
