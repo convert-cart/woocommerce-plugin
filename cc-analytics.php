@@ -22,7 +22,7 @@ namespace ConvertCart\Analytics;
 
 defined( 'ABSPATH' ) || exit;
 
-// HPOS compatibility declaration for WooCommerce 7.1+
+// HPOS compatibility declaration for WooCommerce 7.1+ and later versions
 add_action( 'before_woocommerce_init', function() {
 	if ( class_exists( '\\Automattic\\WooCommerce\\Utilities\\FeaturesUtil' ) ) {
 		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
