@@ -66,7 +66,7 @@ class WC_CC_Analytics extends \WC_Integration {
 		$this->sms_consent_manager = new CC_SMS_Consent_Manager( $this->settings );
 		$this->email_consent_manager = new CC_Email_Consent_Manager( $this->settings );
 		$this->discount_manager = new CC_Discount_Manager( $this->flycart_discount_user_ids );
-		$this->admin_ui = new CC_Admin_UI();
+		$this->admin_ui = new CC_Admin_UI( $this->settings );
 		$this->rest_api = new CC_Rest_API();
 
 		// Initialize all components
