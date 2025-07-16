@@ -23,6 +23,16 @@ class WC_CC_Analytics extends \WC_Integration {
 	public $flycart_discount_user_ids;
 
 	/**
+	 * Extracted component instances
+	 */
+	private $event_tracker;
+	private $sms_consent_manager;
+	private $email_consent_manager;
+	private $discount_manager;
+	private $admin_ui;
+	private $rest_api;
+
+	/**
 	 * Client ID.
 	 *
 	 * @var string
@@ -51,16 +61,24 @@ class WC_CC_Analytics extends \WC_Integration {
 			return;
 		}
 
-		// Register cron on activation/deactivation
-		register_activation_hook( WC_CC_Analytics::get_plugin_file(), array( __CLASS__, 'flycart_register_cron' ) );
-		register_deactivation_hook( WC_CC_Analytics::get_plugin_file(), array( __CLASS__, 'flycart_clear_cron' ) );
+		// Initialize extracted components
+		$this->event_tracker = new CC_Event_Tracker( $this->cc_client_id, $this->get_option( 'debug_mode' ) );
+		$this->sms_consent_manager = new CC_SMS_Consent_Manager( $this->settings );
+		$this->email_consent_manager = new CC_Email_Consent_Manager( $this->settings );
+		$this->discount_manager = new CC_Discount_Manager( $this->flycart_discount_user_ids );
+		$this->admin_ui = new CC_Admin_UI();
+		$this->rest_api = new CC_Rest_API();
 
-		add_action( 'flycart_user_discount_cron_hook', array( $this, 'flycart_user_discount_cron' ) );
+		// Initialize all components
+		$this->event_tracker->init_tracking();
+		$this->discount_manager->init_cron();
+		$this->admin_ui->init_menu();
+		$this->rest_api->init_endpoints();
 
-		// Actions added below.
-		add_action( 'wp_head', array( $this, 'cc_init' ) );
-		add_action( 'wp_footer', array( $this, 'addEvents' ) );
-		add_action( 'woocommerce_thankyou', array( $this, 'ordered' ) );
+		// Register cron on activation/deactivation - delegated to discount manager
+		register_activation_hook( WC_CC_Analytics::get_plugin_file(), array( 'CC_Discount_Manager', 'register_cron' ) );
+		register_deactivation_hook( WC_CC_Analytics::get_plugin_file(), array( 'CC_Discount_Manager', 'clear_cron' ) );
+
 		add_action(
 			'create_product_cat',
 			function ( $term_id, $args ) {
@@ -105,92 +123,26 @@ class WC_CC_Analytics extends \WC_Integration {
 			10,
 			3
 		);
-		add_action( 'woocommerce_admin_product_category_webhook_handler', array( $this, 'sendCategoryRelatedNotification' ), 10, 1 );
-		add_action(
-			'rest_api_init',
-			function () {
-				register_rest_route(
-					'wc/v3',
-					'cc-version',
-					array(
-						'methods'             => 'GET',
-						'callback'            => array( $this, 'getVersionList' ),
-						'permission_callback' => array( $this, 'permissionCallback' ),
-					)
-				);
-			}
-		);
-		add_action(
-			'rest_api_init',
-			function () {
-				register_rest_route(
-					'wc/v3', // Namespace
-					'cc-plugin-info', // Route
-					array(
-						'methods'             => 'GET', // HTTP method
-						'callback'            => array( $this, 'get_plugin_info' ), // Callback function
-						'permission_callback' => array( $this, 'permissionCallback' ), // Permission check
-					)
-				);
-			}
-		);
+		add_action( 'woocommerce_admin_product_category_webhook_handler', array( $this->rest_api, 'send_category_related_notification' ), 10, 1 );
 
-		// Filters
-		add_filter(
-			'woocommerce_rest_product_object_query',
-			function ( array $args, \WP_REST_Request $request ) {
-				$modified_after = $request->get_param( 'modified_after' );
 
-				if ( ! $modified_after ) {
-					return $args;
-				}
-
-				$args['date_query'][0]['column'] = 'post_modified';
-				$args['date_query'][0]['after']  = $modified_after;
-
-				return $args;
-			},
-			10,
-			2
-		);
-
-		add_filter(
-			'woocommerce_rest_orders_prepare_object_query',
-			function ( array $args, \WP_REST_Request $request ) {
-				$modified_after = $request->get_param( 'modified_after' );
-				if ( ! $modified_after ) {
-					return $args;
-				}
-
-				$args['date_query'][0]['column'] = 'post_modified';
-				$args['date_query'][0]['after']  = $modified_after;
-				return $args;
-			},
-			10,
-			2
-		);
-
-		add_filter( 'woocommerce_rest_customer_query', array( $this, 'addUpdatedSinceFilterToRESTApi' ), 10, 2 );
-		add_filter( 'rest_product_collection_params', array( $this, 'maximum_api_filter' ) );
-		add_action( 'woocommerce_review_order_before_submit', array( $this, 'add_sms_consent_checkbox' ) );
-		add_action( 'woocommerce_review_order_before_submit', array( $this, 'add_email_consent_checkbox' ) );
-		add_action( 'woocommerce_checkout_create_order', array( $this, 'save_sms_consent_to_order_or_customer' ), 10, 2 );
-        add_action( 'woocommerce_checkout_create_order', array( $this, 'save_email_consent_to_order_or_customer' ), 10, 2 );
-		add_action( 'woocommerce_update_product', array( $this, 'handle_woocommerce_update_product' ), 20, 1 );
-		add_action( 'woocommerce_created_customer', array( $this, 'save_sms_consent_when_account_is_created' ), 10, 3 );
-		add_action( 'woocommerce_created_customer', array( $this, 'save_email_consent_when_account_is_created' ), 10, 3 );
-		add_action( 'woocommerce_edit_account_form', array( $this, 'add_sms_consent_checkbox_to_account_page' ) );
-		add_action( 'woocommerce_edit_account_form', array( $this, 'add_email_consent_checkbox_to_account_page' ) );
-		add_action( 'woocommerce_save_account_details', array( $this, 'save_sms_consent_from_account_page' ), 12, 1 );
-		add_action( 'woocommerce_save_account_details', array( $this, 'save_email_consent_from_account_page' ), 12, 1 );
-		add_action( 'woocommerce_register_form', array( $this, 'add_sms_consent_to_registration_form' ) );
-		add_action( 'woocommerce_register_form', array( $this, 'add_email_consent_to_registration_form' ) );
-		add_action( 'woocommerce_created_customer', array( $this, 'save_sms_consent_from_registration_form' ), 10, 1 );
-		add_action( 'woocommerce_created_customer', array( $this, 'save_email_consent_from_registration_form' ), 10, 1 );
-		add_action( 'woocommerce_created_customer', array( $this, 'update_consent_from_previous_orders' ), 20, 3 );
-		add_action( 'woocommerce_created_customer', array( $this, 'update_consent_from_previous_orders_email' ), 20, 3 );
-		add_action( 'admin_menu', array( $this, 'add_convert_cart_menu' ) );
-		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_codemirror_assets' ) );
+		add_action( 'woocommerce_review_order_before_submit', array( $this->sms_consent_manager, 'add_checkout_checkbox' ) );
+		add_action( 'woocommerce_review_order_before_submit', array( $this->email_consent_manager, 'add_checkout_checkbox' ) );
+		add_action( 'woocommerce_checkout_create_order', array( $this->sms_consent_manager, 'save_consent_to_order_or_customer' ), 10, 2 );
+        add_action( 'woocommerce_checkout_create_order', array( $this->email_consent_manager, 'save_consent_to_order_or_customer' ), 10, 2 );
+		add_action( 'woocommerce_update_product', array( $this->discount_manager, 'sync_discounts_for_product' ), 20, 1 );
+		add_action( 'woocommerce_created_customer', array( $this->sms_consent_manager, 'save_consent_when_account_is_created' ), 10, 3 );
+		add_action( 'woocommerce_created_customer', array( $this->email_consent_manager, 'save_consent_when_account_is_created' ), 10, 3 );
+		add_action( 'woocommerce_edit_account_form', array( $this->sms_consent_manager, 'add_account_checkbox' ) );
+		add_action( 'woocommerce_edit_account_form', array( $this->email_consent_manager, 'add_account_checkbox' ) );
+		add_action( 'woocommerce_save_account_details', array( $this->sms_consent_manager, 'save_consent_from_account_page' ), 12, 1 );
+		add_action( 'woocommerce_save_account_details', array( $this->email_consent_manager, 'save_consent_from_account_page' ), 12, 1 );
+		add_action( 'woocommerce_register_form', array( $this->sms_consent_manager, 'add_registration_checkbox' ) );
+		add_action( 'woocommerce_register_form', array( $this->email_consent_manager, 'add_registration_checkbox' ) );
+		add_action( 'woocommerce_created_customer', array( $this->sms_consent_manager, 'save_consent_from_registration_form' ), 10, 1 );
+		add_action( 'woocommerce_created_customer', array( $this->email_consent_manager, 'save_consent_from_registration_form' ), 10, 1 );
+		add_action( 'woocommerce_created_customer', array( $this->sms_consent_manager, 'update_consent_from_previous_orders' ), 20, 3 );
+		add_action( 'woocommerce_created_customer', array( $this->email_consent_manager, 'update_consent_from_previous_orders' ), 20, 3 );
 	}
 
 	/**
@@ -336,123 +288,6 @@ class WC_CC_Analytics extends \WC_Integration {
             $this->flycart_user_discount_for_product_update_create( $post_id );
         }
     }
-
-	/**
-	 * Cron logic for Flycart user-based discount sync
-	 */
-	public function flycart_user_discount_cron() {
-		if ( ! has_filter( 'advanced_woo_discount_rules_get_product_discount_price' ) ) {
-			return;
-		}
-
-		$user_ids_raw = $this->get_option('flycart_discount_user_ids', '');
-		if (empty($user_ids_raw)) {
-			$user_ids_raw = get_option('flycart_discount_user_ids', '');
-		}
-		if ( empty( $user_ids_raw ) ) {
-			return;
-		}
-
-		$user_ids = array_filter( array_map( 'intval', explode( ',', $user_ids_raw ) ) );
-		if ( empty( $user_ids ) ) {
-			return;
-		}
-
-		$current_user_id = get_current_user_id();
-
-		$product_ids = get_posts([
-			'post_type'      => ['product', 'product_variation'],
-			'posts_per_page' => -1,
-			'post_status'    => 'publish',
-			'fields'         => 'ids',
-		]);
-
-		foreach ( $user_ids as $user_id ) {
-			$user = get_userdata( $user_id );
-			if ( ! $user ) {
-				continue;
-			}
-
-			wp_set_current_user( $user_id );
-
-			foreach ( $product_ids as $product_id ) {
-				$product = wc_get_product( $product_id );
-				if ( ! $product ) {
-					continue;
-				}
-
-				$discounted_price = apply_filters(
-					'advanced_woo_discount_rules_get_product_discount_price',
-					$product->get_price(),
-					$product
-				);
-
-				if ( $discounted_price === false || $discounted_price === null ) {
-					continue;
-				}
-
-				$new_price = wc_format_decimal( $discounted_price, wc_get_price_decimals() );
-				$meta_key = '_flycart_discounted_price_user_' . $user_id;
-				$old_price = wc_format_decimal( get_post_meta( $product_id, $meta_key, true ), wc_get_price_decimals() );
-
-				if ( !$old_price && $new_price ) {
-					update_post_meta( $product_id, $meta_key, $new_price );
-					wp_update_post( [ 'ID' => $product_id ] );
-				} else if ( $old_price !== $new_price ) {
-					update_post_meta( $product_id, $meta_key, $new_price );
-					wp_update_post( [ 'ID' => $product_id ] );
-				}
-			}
-		}
-
-		wp_set_current_user( $current_user_id );
-	}
-
-	public function flycart_user_discount_for_product_update_create( $product_id ) {
-        if ( ! has_filter( 'advanced_woo_discount_rules_get_product_discount_price' ) ) {
-			return;
-		}
-		$user_ids_raw = $this->get_option('flycart_discount_user_ids', '');
-		if (empty($user_ids_raw)) {
-			$user_ids_raw = get_option('flycart_discount_user_ids', '');
-		}
-		if ( empty( $user_ids_raw ) ) {
-			return;
-		}
-		$user_ids = array_filter( array_map( 'intval', explode( ',', $user_ids_raw ) ) );
-		if ( empty( $user_ids ) ) {
-			return;
-		}
-		$current_user_id = get_current_user_id();
-		foreach ( $user_ids as $user_id ) {
-			$user = get_userdata( $user_id );
-			if ( ! $user ) {
-				continue;
-			}
-			wp_set_current_user( $user_id );
-			$product = wc_get_product( $product_id );
-			if ( ! $product ) {
-				continue;
-			}
-			$discounted_price = apply_filters(
-				'advanced_woo_discount_rules_get_product_discount_price',
-				$product->get_price(),
-				$product
-			);
-			if ( $discounted_price === false || $discounted_price === null ) {
-				continue;
-			}
-			$new_price = wc_format_decimal( $discounted_price, wc_get_price_decimals() );
-			$meta_key = '_flycart_discounted_price_user_' . $user_id;
-			$old_price = wc_format_decimal( get_post_meta( $product_id, $meta_key, true ), wc_get_price_decimals() );
-			if ( !$old_price && $new_price ) {
-				update_post_meta( $product_id, $meta_key, $new_price );
-			} else if ( $old_price !== $new_price ) {
-				update_post_meta( $product_id, $meta_key, $new_price );
-			}
-		}
-		wp_set_current_user( $current_user_id );
-	}
 
 	/**
 	 * Helper to get plugin file for activation/deactivation hooks
