@@ -1,11 +1,1 @@
-<?php
-/**
- * Email Consent Block Asset File
- *
- * @package ConvertCart\Analytics
- */
-
-return array(
-	'dependencies' => array( 'react-jsx-runtime', 'wc-settings', 'wp-block-editor', 'wp-blocks', 'wp-components', 'wp-element', 'wp-i18n', 'wp-polyfill', 'wp-primitives' ),
-	'version'      => '5a19476dc14510f4e6b7',
-);
+<?php return array('dependencies' => array('react-jsx-runtime', 'wc-settings', 'wp-block-editor', 'wp-blocks', 'wp-components', 'wp-element', 'wp-i18n', 'wp-polyfill', 'wp-primitives'), 'version' => 'afe32c244d3e8d9c11d3');

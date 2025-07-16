@@ -16,13 +16,6 @@ const settings = getSetting('convertcart-email-consent_data', {
     consent: false
 });
 
-// Debug log to see what's being retrieved
-if (typeof window !== 'undefined' && window.console) {
-    console.log('ConvertCart: Edit component settings loaded', { 
-        settings, 
-        allSettings: getSetting('convertcart-email-consent_data') 
-    });
-}
 
 const { 
     trackingEnabled = false, 

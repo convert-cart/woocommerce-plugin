@@ -10,12 +10,6 @@ const settings = getSetting('convertcart-sms-consent_data', {
     consent: false
 });
 
-if (typeof window !== 'undefined' && window.console) {
-	console.log('ConvertCart: SMS Consent Block settings loaded', { 
-        settings,
-        allAvailableSettings: Object.keys(getSetting('') || {})
-    });
-}
 
 const { 
     defaultText = 'I consent to SMS communications.', 
@@ -23,10 +17,6 @@ const {
     consent = false
 } = settings;
 
-// Debug log settings
-if (typeof window !== 'undefined' && window.console) {
-	console.log('ConvertCart: SMS Consent Block settings loaded', { settings, defaultText, trackingEnabled });
-}
 
 export function SMSConsentBlock({ checkoutExtensionData }) {
 	const [isChecked, setIsChecked] = useState(consent);
@@ -36,27 +26,12 @@ export function SMSConsentBlock({ checkoutExtensionData }) {
 		if (setExtensionData) {
 			setExtensionData("convertcart", "sms_consent", isChecked);
 			
-			// Debug log
-			if (typeof window !== 'undefined' && window.console) {
-				console.log('ConvertCart: Setting SMS consent data', isChecked);
-			}
 		} else {
-            // Debug log
-            if (typeof window !== 'undefined' && window.console) {
-                console.warn('ConvertCart: setExtensionData is not available in checkoutExtensionData');
-            }
         }
 	}, [isChecked, setExtensionData]);
 
-    // Debug log render attempt
-    if (typeof window !== 'undefined' && window.console) {
-        console.log('ConvertCart: SMS Consent Block render attempt', { trackingEnabled, defaultText });
-    }
 
     if (!trackingEnabled) {
-        if (typeof window !== 'undefined' && window.console) {
-            console.log('ConvertCart: SMS Consent Block not rendered - tracking disabled');
-        }
         return null;
     }
 

@@ -1,11 +1,1 @@
-<?php
-/**
- * SMS Consent Block Frontend Asset File
- *
- * @package ConvertCart\Analytics
- */
-
-return array(
-	'dependencies' => array( 'react-jsx-runtime', 'wc-blocks-checkout', 'wc-settings', 'wp-element', 'wp-i18n', 'wp-polyfill' ),
-	'version'      => '5468430d4ef013b22afc',
-);
+<?php return array('dependencies' => array('react-jsx-runtime', 'wc-blocks-checkout', 'wc-settings', 'wp-element', 'wp-i18n', 'wp-polyfill'), 'version' => 'eb5329a6dcb2e993f78a');
