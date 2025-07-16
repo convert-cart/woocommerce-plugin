@@ -94,7 +94,7 @@ add_action(
 		// Register SMS Consent Block
 		require_once plugin_dir_path( __FILE__ ) . 'includes/class-convertcart-sms-consent-block-integration.php';
 		if ( class_exists( 'ConvertCart\\Analytics\\ConvertCart_SMS_Consent_Block_Integration' ) ) {
-			$integration_registry->register( new ConvertCart_SMS_Consent_Block_Integration() );
+			$integration_registry->register( new \ConvertCart\Analytics\ConvertCart_SMS_Consent_Block_Integration() );
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG === true ) {
 				error_log( 'ConvertCart: SMS Consent Block registered successfully' );
 			}
@@ -103,7 +103,7 @@ add_action(
 		// Register Email Consent Block
 		require_once plugin_dir_path( __FILE__ ) . 'includes/class-convertcart-email-consent-block-integration.php';
 		if ( class_exists( 'ConvertCart\\Analytics\\ConvertCart_Email_Consent_Block_Integration' ) ) {
-			$integration_registry->register( new ConvertCart_Email_Consent_Block_Integration() );
+			$integration_registry->register( new \ConvertCart\Analytics\ConvertCart_Email_Consent_Block_Integration() );
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG === true ) {
 				error_log( 'ConvertCart: Email Consent Block registered successfully' );
 			}
