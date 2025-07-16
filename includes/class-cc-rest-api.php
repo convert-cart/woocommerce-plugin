@@ -1,4 +1,9 @@
 <?php
+/**
+ * REST API Class
+ *
+ * @package ConvertCart\Analytics
+ */
 
 namespace ConvertCart\Analytics;
 

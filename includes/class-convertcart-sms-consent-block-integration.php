@@ -1,4 +1,9 @@
 <?php
+/**
+ * SMS Consent Block Integration
+ *
+ * @package ConvertCart\Analytics
+ */
 
 namespace ConvertCart\Analytics;
 

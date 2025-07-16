@@ -1,4 +1,9 @@
 <?php
+/**
+ * Discount Manager Class
+ *
+ * @package ConvertCart\Analytics
+ */
 
 namespace ConvertCart\Analytics;
 

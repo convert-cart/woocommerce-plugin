@@ -1,4 +1,9 @@
 <?php
+/**
+ * Admin UI Class
+ *
+ * @package ConvertCart\Analytics
+ */
 
 namespace ConvertCart\Analytics;
 

@@ -1,4 +1,9 @@
 <?php
+/**
+ * Event Tracker Class
+ *
+ * @package ConvertCart\Analytics
+ */
 
 namespace ConvertCart\Analytics;
 

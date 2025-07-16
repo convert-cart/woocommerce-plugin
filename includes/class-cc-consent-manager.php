@@ -1,4 +1,9 @@
 <?php
+/**
+ * Consent Manager Classes
+ *
+ * @package ConvertCart\Analytics
+ */
 
 namespace ConvertCart\Analytics;
 
