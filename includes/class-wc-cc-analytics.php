@@ -75,9 +75,9 @@ class WC_CC_Analytics extends \WC_Integration {
 		$this->admin_ui->init_menu();
 		$this->rest_api->init_endpoints();
 
-		// Register cron on activation/deactivation - delegated to discount manager
-		register_activation_hook( WC_CC_Analytics::get_plugin_file(), array( 'CC_Discount_Manager', 'register_cron' ) );
-		register_deactivation_hook( WC_CC_Analytics::get_plugin_file(), array( 'CC_Discount_Manager', 'clear_cron' ) );
+		// Register cron on activation/deactivation - using proper namespaced class references
+		register_activation_hook( WC_CC_Analytics::get_plugin_file(), array( $this->discount_manager, 'register_cron' ) );
+		register_deactivation_hook( WC_CC_Analytics::get_plugin_file(), array( $this->discount_manager, 'clear_cron' ) );
 
 		add_action(
 			'create_product_cat',
