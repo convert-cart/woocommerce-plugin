@@ -103,18 +103,20 @@ class ConvertCart_SMS_Consent_Block_Integration implements IntegrationInterface 
 				. ' and tracking enabled: ' . ( $smsConsent ? 'true' : 'false' )
 			);
 		}
-		// Return the data array
-		if ( is_user_logged_in() ) {
-			// Here we only need the consent data from user meta
-			$user_sms_consent = get_user_meta( get_current_user_id(), 'sms_consent', true );
-		} else {
-			$user_sms_consent = false; // Default to false for non-logged-in users
-		}
-		return array(
-			'defaultText'     => __( $text, 'convertcart' ),
-			'trackingEnabled' => $smsConsent,
-			'consent'         => $user_sms_consent === 'yes' ? true : false,
-		);
+		   // Return the data array
+		   if ( is_user_logged_in() ) {
+			   // Here we only need the consent data from user meta
+			   $user_sms_consent = get_user_meta( get_current_user_id(), 'sms_consent', true );
+		   } else {
+			   $user_sms_consent = false; // Default to false for non-logged-in users
+		   }
+		   $plugin_url = defined( 'CONVERTCART_PLUGIN_URL' ) ? CONVERTCART_PLUGIN_URL : plugins_url( '/', dirname( __DIR__ ) . '/cc-analytics.php' );
+		   return array(
+			   'defaultText'     => __( $text, 'convertcart' ),
+			   'trackingEnabled' => $smsConsent,
+			   'consent'         => $user_sms_consent === 'yes' ? true : false,
+			   'pluginUrl'       => $plugin_url . 'assets/images/icon_black.svg',
+		   );
 	}
 
 	/**

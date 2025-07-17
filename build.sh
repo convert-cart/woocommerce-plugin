@@ -35,6 +35,14 @@ cp CHANGELOG.md $BUILD_DIR/$PLUGIN_DIR/
 # Copy includes directory
 cp -r includes/ $BUILD_DIR/$PLUGIN_DIR/
 
+# Copy images directory if it exists
+if [ -d "assets/images" ]; then
+    mkdir -p $BUILD_DIR/$PLUGIN_DIR/assets/images
+    cp -r assets/images/* $BUILD_DIR/$PLUGIN_DIR/assets/images/
+else
+    echo "⚠️  assets/images directory not found, skipping..."
+fi
+
 # Copy only necessary asset files
 mkdir -p $BUILD_DIR/$PLUGIN_DIR/assets/dist/js/sms_consent
 cp -r assets/dist/js/sms_consent/* $BUILD_DIR/$PLUGIN_DIR/assets/dist/js/sms_consent/

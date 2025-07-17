@@ -33,15 +33,18 @@ class CC_Admin_UI {
 		}
 
 		if ( $show_menu ) {
+
+            $plugin_url = defined( 'CONVERTCART_PLUGIN_URL' ) ? CONVERTCART_PLUGIN_URL : plugins_url( '', dirname( __DIR__ ) . '/cc-analytics.php' );
+
 			add_menu_page(
-				__( 'Convert Cart', 'woocommerce_cc_analytics' ),
-				__( 'Convert Cart', 'woocommerce_cc_analytics' ),
-				'manage_options',
-				'convert-cart-settings',
-				array( $this, 'render_convert_cart_settings_page' ),
-				'dashicons-edit',
-				60
-			);
+                __( 'Convert Cart', 'woocommerce_cc_analytics' ),
+                __( 'Convert Cart', 'woocommerce_cc_analytics' ),
+                'manage_options',
+                'convert-cart-settings',
+                array( $this, 'render_convert_cart_settings_page' ),
+                $plugin_url . 'assets/images/icon_resize.svg',
+                60
+            );
 		}
 	}
 

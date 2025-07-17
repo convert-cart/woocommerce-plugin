@@ -7,7 +7,6 @@ import { useBlockProps, RichText } from '@wordpress/block-editor';
 import { CheckboxControl } from '@wordpress/components';
 import { getSetting } from '@woocommerce/settings';
 import { Placeholder, Button } from '@wordpress/components';
-import { Icon, megaphone } from '@wordpress/icons';
 
 const adminUrl = getSetting('adminUrl', '');
 const settings = getSetting('convertcart-sms-consent_data', {
@@ -20,14 +19,15 @@ const settings = getSetting('convertcart-sms-consent_data', {
 const { 
     trackingEnabled = false, 
     defaultText = 'I consent to SMS communications.',
-    consent = false
+    consent = false,
+    pluginUrl = ''
 } = settings;
 
 function EmptyState() {
   const adminUrlToEnableOptIn = `${adminUrl}admin.php?page=wc-settings&tab=integration&section=cc_analytics`;
   return (
     <Placeholder
-      icon={<Icon icon={megaphone} />}
+      icon={<img src={pluginUrl} alt="ConvertCart" height={32}  width={32} style={{ filter: 'none', opacity: 1, marginLeft: '8px', marginRight: '8px' }} />}
       label={__('ConvertCart SMS Consent', 'convertcart')}
       className="wp-block-convertcart-sms-consent-placeholder"
     >

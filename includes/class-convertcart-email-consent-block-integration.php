@@ -93,12 +93,14 @@ class ConvertCart_Email_Consent_Block_Integration implements IntegrationInterfac
 		} else {
 			$user_email_consent = false; // Default to false for non-logged-in users
 		}
-		// Return the data array
-		return array(
-			'defaultText'     => __( $text, 'convertcart' ),
-			'trackingEnabled' => $emailConsent,
-			'consent'         => $user_email_consent === 'yes' ? true : false,
-		);
+		   // Add pluginUrl for JS usage
+		   $plugin_url = defined( 'CONVERTCART_PLUGIN_URL' ) ? CONVERTCART_PLUGIN_URL : plugins_url( '/', dirname( __DIR__ ) . '/cc-analytics.php' );
+		   return array(
+			   'defaultText'     => __( $text, 'convertcart' ),
+			   'trackingEnabled' => $emailConsent,
+			   'consent'         => $user_email_consent === 'yes' ? true : false,
+			   'pluginUrl'       => $plugin_url . 'assets/images/icon_black.svg',
+		   );
 	}
 
 	private function register_block_type() {
