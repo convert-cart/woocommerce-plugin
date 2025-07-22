@@ -322,7 +322,7 @@ class WC_CC_Analytics extends \WC_Integration {
 				r.src = v + s + '.js';
 				t = o.getElementsByTagName(n)[0];
 				t.parentNode.insertBefore(r, t);
-			})(window, document, 'script', '//cdn.convertcart.com/" . $this->cc_client_id . "', 'ccart');
+			})(window, document, 'script', '//cdn-beta.convertcart.com/" . $this->cc_client_id . "', 'ccart');
 		</script>";
 	}
 
