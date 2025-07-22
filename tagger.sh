@@ -78,6 +78,70 @@ fi
 # Create a backup branch to prevent affecting master directly
 git checkout -b $BACKUP_BRANCH || handle_error "Failed to create temporary branch $BACKUP_BRANCH"
 
+# Function to check and setup Node.js version 19
+setup_node_19() {
+    printf "${YELLOW}Checking Node.js version...${NC}\n"
+    
+    # Check if nvm is available
+    if ! command -v nvm &> /dev/null; then
+        printf "${RED}nvm not found. Installing nvm...${NC}\n"
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    fi
+    
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    
+    if command -v node &> /dev/null; then
+        CURRENT_NODE_VERSION=$(node --version | sed 's/v//')
+        MAJOR_VERSION=$(echo $CURRENT_NODE_VERSION | cut -d. -f1)
+        
+        if [ "$MAJOR_VERSION" != "19" ]; then
+            printf "${YELLOW}Current Node.js version is v$CURRENT_NODE_VERSION. Installing Node.js 19...${NC}\n"
+            nvm install 19
+            nvm use 19
+        else
+            printf "${GREEN}Node.js version 19 is already active (v$CURRENT_NODE_VERSION)${NC}\n"
+        fi
+    else
+        printf "${YELLOW}Node.js not found. Installing Node.js 19...${NC}\n"
+        nvm install 19
+        nvm use 19
+    fi
+}
+
+# Function to check and setup pnpm
+setup_pnpm() {
+    printf "${YELLOW}Checking pnpm package manager...${NC}\n"
+    
+    if ! command -v pnpm &> /dev/null; then
+        printf "${YELLOW}pnpm not found. Installing pnpm...${NC}\n"
+        npm install -g pnpm || handle_error "Failed to install pnpm"
+    else
+        printf "${GREEN}pnpm is already available ($(pnpm --version))${NC}\n"
+    fi
+}
+
+# Function to run build and verify it works
+run_build_consent() {
+    printf "${YELLOW}Running pnpm build:consent to verify build works...${NC}\n"
+    
+    if [ ! -d "node_modules" ]; then
+        printf "${YELLOW}Installing dependencies...${NC}\n"
+        pnpm install || handle_error "Failed to install dependencies"
+    fi
+    
+    pnpm build:consent || handle_error "Failed to run pnpm build:consent"
+    
+    printf "${GREEN}Build completed successfully${NC}\n"
+}
+
+setup_node_19
+setup_pnpm
+run_build_consent
+
 # Function to check if a tag exists on remote
 check_remote_tag_exists() {
     git fetch --tags

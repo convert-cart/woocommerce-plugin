@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2025-07-22
+### Added
+- Added support for Gutenberg's block-based checkout to enable consent tracking.
+- Refactored and restructured the plugin for improved maintainability and scalability.
+
 ## [1.3.5] - 2025-06-19
 ### Added
 - Added support to store Flycart discounted price in product meta based on user IDs.
