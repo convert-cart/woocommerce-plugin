@@ -82,10 +82,31 @@ class ConvertCart_SMS_Consent_Block_Integration implements IntegrationInterface 
      */
     public function get_script_data() {
         $options = get_option('woocommerce_cc_analytics_settings', array());
+        $smsConsent = isset($options['enable_sms_consent']) && ( 'live' === $options['enable_sms_consent'] ) ? true : false;
+        $html = get_option('cc_sms_consent_checkout_html', '');
+        $text = !empty($html) ? strip_tags($html) : __('I consent to SMS communications.', 'convertcart');
+        // If the text is empty, use a default message
+        if (empty($text)) {
+            $text = __('I consent to SMS communications.', 'convertcart');
+        }
+        // Ensure the text is sanitized
+        $text = sanitize_text_field($text);
+        // Debug: Log the prepared data
+        if (defined('WP_DEBUG') && WP_DEBUG === true) {
+            error_log('ConvertCart: SMS consent block data prepared with text: ' . $text
+            . ' and tracking enabled: ' . ($smsConsent ? 'true' : 'false'));
+        }
+        // Return the data array
+        if ( is_user_logged_in() ) {
+            // Here we only need the consent data from user meta
+            $user_sms_consent = get_user_meta( get_current_user_id(), 'sms_consent', true );
+        } else {
+            $user_sms_consent = false; // Default to false for non-logged-in users
+        }
         return array(
-            'defaultText'      => __('I consent to SMS communications.', 'convertcart'),
-            'trackingEnabled' => !empty($options['cc_client_id']),
-            'settings'         => $options // For debugging/visibility
+            'defaultText'      => __($text, 'convertcart'),
+            'trackingEnabled' => $smsConsent,
+            'consent' => $user_sms_consent === 'yes' ? true : false,
         );
     }
 

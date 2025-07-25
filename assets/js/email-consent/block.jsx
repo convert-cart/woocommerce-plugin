@@ -18,7 +18,8 @@ if (typeof window !== 'undefined' && window.console) {
 
 const { 
     defaultText = 'I consent to Email communications.', 
-    trackingEnabled = false 
+    trackingEnabled = false,
+    consent = false
 } = settings;
 
 // Debug log settings
@@ -27,7 +28,7 @@ if (typeof window !== 'undefined' && window.console) {
 }
 
 export function EmailConsentBlock({ checkoutExtensionData }) {
-	const [isChecked, setIsChecked] = useState(false);
+	const [isChecked, setIsChecked] = useState(consent);
 	const { setExtensionData } = checkoutExtensionData || {};
 	
 	useEffect(() => {

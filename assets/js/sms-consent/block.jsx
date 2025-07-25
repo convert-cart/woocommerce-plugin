@@ -6,7 +6,8 @@ import { getSetting } from '@woocommerce/settings';
 // Get settings with fallback values
 const settings = getSetting('convertcart-sms-consent_data', {
     trackingEnabled: false,
-    defaultText: 'I consent to SMS communications.'
+    defaultText: 'I consent to SMS communications.',
+    consent: false
 });
 
 if (typeof window !== 'undefined' && window.console) {
@@ -18,7 +19,8 @@ if (typeof window !== 'undefined' && window.console) {
 
 const { 
     defaultText = 'I consent to SMS communications.', 
-    trackingEnabled = false 
+    trackingEnabled = false,
+    consent = false
 } = settings;
 
 // Debug log settings
@@ -27,7 +29,7 @@ if (typeof window !== 'undefined' && window.console) {
 }
 
 export function SMSConsentBlock({ checkoutExtensionData }) {
-	const [isChecked, setIsChecked] = useState(false);
+	const [isChecked, setIsChecked] = useState(consent);
 	const { setExtensionData } = checkoutExtensionData || {};
 	
 	useEffect(() => {

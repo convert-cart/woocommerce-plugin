@@ -12,7 +12,8 @@ import { Icon, megaphone } from '@wordpress/icons';
 const adminUrl = getSetting('adminUrl', '');
 const settings = getSetting('convertcart-sms-consent_data', {
     trackingEnabled: false,
-    defaultText: 'I consent to SMS communications.'
+    defaultText: 'I consent to SMS communications.',
+    consent: false
 });
 
 // Debug log to see what's being retrieved
@@ -25,7 +26,8 @@ if (typeof window !== 'undefined' && window.console) {
 
 const { 
     trackingEnabled = false, 
-    defaultText = 'I consent to SMS communications.' 
+    defaultText = 'I consent to SMS communications.',
+    consent = false
 } = settings;
 
 function EmptyState() {
