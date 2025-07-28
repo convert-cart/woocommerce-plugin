@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.1] - 2025-07-28
+### Fixed
+- Fixed stdClass array access error in category notifications on older WordPress versions.
+- Handled missing StoreApi class error when WooCommerce Blocks is inactive.
+
 ## [1.4.0] - 2025-07-22
 ### Added
 - Added support for Gutenberg's block-based checkout to enable consent tracking.
