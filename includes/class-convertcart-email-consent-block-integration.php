@@ -9,6 +9,10 @@ namespace ConvertCart\Analytics;
 
 defined( 'ABSPATH' ) || exit;
 
+if ( ! class_exists( '\Automattic\WooCommerce\Blocks\Integrations\IntegrationInterface' ) ) {
+	return;
+}
+
 use Automattic\WooCommerce\Blocks\Integrations\IntegrationInterface;
 
 class ConvertCart_Email_Consent_Block_Integration implements IntegrationInterface {

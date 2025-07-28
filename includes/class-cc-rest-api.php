@@ -162,8 +162,9 @@ class CC_Rest_API {
 		if ( false === $results ) {
 			$results = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT option_name, option_value FROM $wpdb->options WHERE option_name LIKE %s",
-					'cc_%'
+					"SELECT webhook_id, `name`, delivery_url FROM {$wpdb->prefix}wc_webhooks WHERE topic='{$original_resource}.{$event}' AND `name` LIKE %s AND delivery_url LIKE %s",
+					'convertcart%',
+					'%data-warehouse%'
 				)
 			);
 			if ( function_exists( 'wp_cache_set' ) ) {
@@ -172,7 +173,7 @@ class CC_Rest_API {
 		}
 
 		foreach ( $results as $result ) {
-			$model_delivery_url = $result['delivery_url'];
+			$model_delivery_url = $result->delivery_url;
 			$target_url         = preg_replace( "/{$original_resource}/", "{$modified_resource}", $model_delivery_url );
 
 			$opts = array(
