@@ -115,6 +115,15 @@ add_action(
 add_action(
 	'woocommerce_blocks_loaded',
 	function () {
+		if ( ! class_exists( '\Automattic\WooCommerce\StoreApi\StoreApi' ) ) {
+			return;
+		}
+		
+		if ( ! class_exists( '\Automattic\WooCommerce\StoreApi\Schemas\ExtendSchema' ) || 
+			 ! class_exists( '\Automattic\WooCommerce\StoreApi\Schemas\V1\CheckoutSchema' ) ) {
+			return;
+		}
+
 		$extend = \Automattic\WooCommerce\StoreApi\StoreApi::container()->get(
 			\Automattic\WooCommerce\StoreApi\Schemas\ExtendSchema::class
 		);
