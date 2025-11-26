@@ -75,6 +75,9 @@ class WC_CC_Analytics extends \WC_Integration {
 		$this->admin_ui->init_menu();
 		$this->rest_api->init_endpoints();
 
+		// Wire up the cron hook to execute discount sync
+		add_action( 'flycart_user_discount_cron_hook', array( $this->discount_manager, 'sync_all_discounts' ) );
+
 		// Register cron on activation/deactivation - using proper namespaced class references
 		register_activation_hook( WC_CC_Analytics::get_plugin_file(), array( $this->discount_manager, 'register_cron' ) );
 		register_deactivation_hook( WC_CC_Analytics::get_plugin_file(), array( $this->discount_manager, 'clear_cron' ) );
@@ -229,11 +232,24 @@ class WC_CC_Analytics extends \WC_Integration {
 		// If value becomes empty, clear the cron job
 		if ( empty( $new_user_ids ) ) {
 			self::flycart_clear_cron();
+			return; // Don't proceed with sync if user IDs are empty
 		}
 
-		// If previously empty and now set, run job immediately and schedule cron
-		if ( empty( $prev_user_ids ) && ! empty( $new_user_ids ) || $prev_user_ids !== $new_user_ids ) {
-			$this->flycart_user_discount_cron();
+		// If previously empty and now set, or if user IDs changed, run job immediately and schedule cron
+		if ( ( empty( $prev_user_ids ) && ! empty( $new_user_ids ) ) || $prev_user_ids !== $new_user_ids ) {
+			// Recreate discount_manager instance with new user IDs to ensure it has the latest values
+			$discount_manager_needs_init = ! $this->discount_manager;
+
+			$this->discount_manager = new CC_Discount_Manager( $new_user_ids );
+
+			// Only init cron and wire up action if this is a new instance
+			if ( $discount_manager_needs_init ) {
+				$this->discount_manager->init_cron();
+				// Wire up the cron hook to execute discount sync
+				add_action( 'flycart_user_discount_cron_hook', array( $this->discount_manager, 'sync_all_discounts' ) );
+			}
+
+			$this->discount_manager->sync_all_discounts();
 			self::flycart_register_cron();
 		}
 	}
